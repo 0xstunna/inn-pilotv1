@@ -1,0 +1,34 @@
+{
+  /* The server half: Vercel functions (api/) and the AI layer they call
+     (server/). Separate from tsconfig.app.json because this code runs on
+     Node, never in the browser — it has no DOM, and it may read
+     process.env, which the app deliberately cannot. Referenced from
+     tsconfig.json so `npm run build` type-checks it alongside the app. */
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    /* Relative imports must end in .js (resolved here to the .ts source):
+       Vercel runs each compiled file as a native ES module, and Node's ESM
+       loader never adds an extension. `npm run verify:vercel` catches a
+       missing one; tsx and Vite would hide it. */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["api", "server", "scripts/verify", "scripts/seed"]
+}

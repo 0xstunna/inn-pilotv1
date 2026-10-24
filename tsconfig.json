@@ -1,0 +1,19 @@
+{
+  /* Solution file: `tsc -b` builds the three referenced projects, and this
+     file compiles nothing itself ("files": []). Vercel's own type-check of
+     api/ does not take "strict" from here (setting it changed nothing in the
+     deployment logs), so server code must also type-check with strict off.
+     `npm run verify:vercel` checks exactly that. */
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./tsconfig.server.json"
+    }
+  ]
+}
