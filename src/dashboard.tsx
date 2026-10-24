@@ -15,6 +15,7 @@ import {
   Settings,
   MessagesSquare,
   X,
+  DoorOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Tippy from "@tippyjs/react";
