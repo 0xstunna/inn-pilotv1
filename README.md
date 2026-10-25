@@ -1,49 +1,63 @@
-# InnPilot — AI-Powered Accommodation Discovery & Booking Concierge
+# InnPilot — The AI Booking Concierge Built for Hospitality
 
-InnPilot is an AI-powered accommodation discovery and booking concierge that helps guests find suitable hotel rooms, compare actual availability and prices, and complete reservations. It addresses slow guest response times and lost booking opportunities by enabling real-time conversation-driven booking with direct integration to hotel inventory.
+**Turn every guest inquiry into a confirmed booking — without the delay.**
 
-## Product Overview
+InnPilot is an AI-powered booking concierge designed for hotels, guesthouses, lodges, resorts, and other hospitality businesses. It solves two of the industry's most costly problems: **slow response times** and **lost booking opportunities**. By combining conversational AI with your live inventory, InnPilot captures, qualifies, and books guests in real-time — even outside front desk hours.
 
-InnPilot connects guests with participating hotels through an intelligent AI concierge. Guests describe their travel needs in natural language, and the system:
+## The Problem
 
-1. **Understands requirements** - Extracts destination, dates, party size, room preferences
-2. **Finds suitable options** - Searches actual hotel inventory for available rooms
-3. **Compares transparently** - Shows real prices, amenities, and availability
-4. **Guides booking** - Collects only necessary details and confirms before booking
-5. **Creates real reservations** - Persists bookings with unique references
+- **Slow responses kill bookings.** Most guests won't wait hours for a quote. If you don't reply quickly, they book elsewhere.
+- **Lost opportunities add up.** Missed DMs, after-hours inquiries, and back-and-forth over availability mean revenue that never makes it to your property.
 
-The AI provides intelligence while InnPilot provides truth - hotels, rooms, availability, prices, and booking references all come from trusted database sources, never from model inference.
+## The Solution
 
-## Core Capabilities
+InnPilot acts as your always-on booking agent. Guests chat naturally, and the system checks **your actual rooms, availability, and rates** to give real answers — then guides them to a confirmed reservation without guesswork.
 
-### For Guests
-- **Natural conversation** - Describe travel needs in plain language
-- **Smart search** - Find accommodation by destination, dates, guests, and preferences
-- **Real-time availability** - Only see rooms actually available for requested dates
-- **Transparent pricing** - Clear nightly rates and total stay costs with currency
-- **Guided booking** - Progressive information collection, only what's needed
-- **Instant confirmation** - Get real booking references after successful reservation
-- **Multiple room support** - Can handle requests for multiple rooms where supported
+## How It Works
 
-### For Hotel Staff
-- **Property configuration** - Set hotel details, location, contact info, policies, amenities
-- **Room inventory management** - Add physical rooms with unique identifiers (e.g., "101", "Garden Room")
-- **Room categories** - Define room types and assign physical rooms to categories
-- **Dynamic pricing** - Configure standard nightly rates per room
-- **Amenities management** - Distinguish property-wide facilities from room-specific amenities
-- **Reservation management** - View and manage bookings from the concierge and front desk
-- **Guest inquiries** - Monitor conversations in the inbox with AI handoff capability
-- **AI Concierge listing** - Control visibility in network search and configure public profile
+1. **Always-on intake** – Guests message in plain language anytime, day or night.
+2. **Live inventory check** – Every search pulls from your real rooms and existing bookings to show only what's actually free.
+3. **Transparent quotes** – Prices are calculated from your configured rates with no made-up figures.
+4. **Guided booking** – The concierge collects only what's needed and confirms before booking.
+5. **Instant confirmation** – A real reservation is created with a unique reference the moment a guest confirms.
 
-### Technical Features
-- **Firestore persistence** - All data stored securely in Firestore
-- **AI integration** - Supports Groq (default) and Google Gemini providers
-- **Security rules** - Granular access control protecting guest data
-- **Transaction safety** - Atomic booking creation prevents double-booking
-- **Audit trails** - Track important actions
-- **Multi-currency support** - UGX, KES, TZS, RWF, USD, EUR, GBP
+The AI provides the conversation. **InnPilot enforces the truth** — rooms, rates, availability, and booking references all come from your property data.
 
-*Planned capabilities:* Advanced seasonal pricing, paid extras management, multi-property chains
+## Built For The Entire Hospitality Sector
+
+InnPilot works for any accommodation provider, including:
+
+- **Hotels & boutique hotels** – Manage inventory across room types with ease
+- **Guesthouses & B&Bs** – Simple setup, professional booking flow
+- **Lodges & safari camps** – Handle inquiries from anywhere, in any currency
+- **Resorts & aparthotels** – Scale as you grow with a flexible room model
+- **Hostels & multi-room properties** – Keep availability accurate across all rooms
+
+## Key Benefits
+
+### For Your Property
+- **Capture more bookings** – Respond instantly to inquiries 24/7
+- **Recover after-hours revenue** – Turn night-time messages into confirmed stays
+- **Cut response time to seconds** – No more manual availability checks
+- **Prevent double-bookings** – Atomic transactions lock rooms at booking time
+- **Stay in control** – Hand off to your team in the inbox anytime with AI-to-human handoff
+- **Own your listing** – Share your own concierge link and control when you're listed
+
+### For Your Guests
+- **Book in one conversation** – No forms, no waiting for quotes
+- **See real availability & pricing** – Total stay costs upfront, in your property's currency
+- **Instant confirmation** – Get a booking reference right away
+- **Local, relevant recommendations** – Find the right fit based on their needs
+
+## Powerful Property Tools
+
+- **Room inventory** – Add physical rooms with numbers/names and assign to room types
+- **Pricing & currency** – Set rates per room in UGX, KES, TZS, RWF, USD, EUR, GBP and more
+- **Amenities & policies** – Showcase what sets your property apart
+- **Public concierge profile** – Publish a shareable link to drive direct bookings
+- **Unified inbox** – Track every guest conversation with status, handoffs, and follow-ups
+- **Reservation management** – View, manage, and track all bookings in one place
+- **AI Concierge controls** – Toggle listing visibility on your terms
 
 ## Architecture
 
@@ -53,8 +67,8 @@ The AI provides intelligence while InnPilot provides truth - hotels, rooms, avai
 - **Styling**: Tailwind CSS v4
 - **Backend**: Vercel Functions (Node.js/TypeScript) + local dev server
 - **Database**: Firebase Firestore
-- **Authentication**: Workspace-based (no user accounts) with hotel ID as key
-- **AI**: Groq SDK / Google Generative AI
+- **Authentication**: Workspace-based (no user accounts) with hotel/property ID as key
+- **AI**: Groq (default) / Google Gemini
 - **Desktop**: Electron support
 
 ### Directory Structure
@@ -62,7 +76,7 @@ The AI provides intelligence while InnPilot provides truth - hotels, rooms, avai
 ├── api/ai/          # Vercel serverless functions (concierge, health, etc.)
 ├── server/          # Server-side logic, AI tools, admin SDK
 │   ├── ai/          # AI provider, prompts, tools
-│   └── ...          # Network, hotels, conversations
+│   └── ...          # Network, properties, conversations
 ├── src/             # React frontend
 │   ├── pages/       # Page components (concierge, dashboard, etc.)
 │   ├── lib/         # Shared utilities, services, types
