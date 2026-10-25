@@ -25,6 +25,11 @@ import {
 export interface HotelProfile extends HotelListing {
   name: string;
   location: string;
+  /** Address, town/city, region and country details */
+  address?: string;
+  town?: string;
+  region?: string;
+  country?: string;
   /** ISO-ish currency code used for every amount shown in the app. */
   currency: string;
   phone: string;
@@ -35,6 +40,10 @@ export interface HotelProfile extends HotelListing {
   planStatus: string;
   /** The guest-facing id in the concierge link; "" for a workspace created before public ids. */
   publicId: string;
+  /** Property-wide facilities and amenities */
+  propertyAmenities?: string[];
+  /** Property photographs */
+  photos?: string[];
 }
 
 export const EMPTY_PROFILE: HotelProfile = {
@@ -47,6 +56,8 @@ export const EMPTY_PROFILE: HotelProfile = {
   plan: "trial",
   planStatus: "active",
   publicId: "",
+  propertyAmenities: [],
+  photos: [],
   ...toHotelListing({}),
 };
 
@@ -54,7 +65,14 @@ export const EMPTY_PROFILE: HotelProfile = {
 export type EditableProfile = Pick<
   HotelProfile,
   "name" | "location" | "currency" | "phone" | "email" | "taxId"
->;
+> & {
+  address?: string;
+  town?: string;
+  region?: string;
+  country?: string;
+  propertyAmenities?: string[];
+  photos?: string[];
+};
 
 export const EDITABLE_KEYS: (keyof EditableProfile)[] = [
   "name",
@@ -63,6 +81,12 @@ export const EDITABLE_KEYS: (keyof EditableProfile)[] = [
   "phone",
   "email",
   "taxId",
+  "address",
+  "town",
+  "region",
+  "country",
+  "propertyAmenities",
+  "photos",
 ];
 
 export const CURRENCIES = ["UGX", "KES", "TZS", "RWF", "USD", "EUR", "GBP"];
@@ -73,6 +97,10 @@ function toProfile(data: Record<string, unknown> | undefined): HotelProfile {
   return {
     name: String(data.name ?? ""),
     location: String(data.location ?? ""),
+    address: typeof data.address === "string" ? data.address : undefined,
+    town: typeof data.town === "string" ? data.town : undefined,
+    region: typeof data.region === "string" ? data.region : (data as any).region || undefined,
+    country: typeof data.country === "string" ? data.country : undefined,
     currency: String(data.currency ?? DEFAULT_CURRENCY) || DEFAULT_CURRENCY,
     phone: String(data.phone ?? ""),
     email: String(data.email ?? ""),
@@ -80,6 +108,8 @@ function toProfile(data: Record<string, unknown> | undefined): HotelProfile {
     plan: String(subscription.plan ?? "trial"),
     planStatus: String(subscription.status ?? "active"),
     publicId: typeof data.publicId === "string" ? data.publicId : "",
+    propertyAmenities: Array.isArray(data.propertyAmenities) ? data.propertyAmenities.filter((a) => typeof a === "string") : Array.isArray((data as any).amenities) ? (data as any).amenities.filter((a: any) => typeof a === "string") : [],
+    photos: Array.isArray(data.photos) ? data.photos.filter((a) => typeof a === "string") : [],
     ...toHotelListing(data),
   };
 }
@@ -128,14 +158,21 @@ export async function saveHotelProfile(
   if (!input.currency.trim()) return fail("Choose a currency.");
 
   try {
-    await updateDoc(hotelDocRef(hotelId), {
+    const payload: Record<string, unknown> = {
       name: input.name.trim(),
       location: input.location.trim(),
       currency: input.currency.trim().toUpperCase(),
       phone: input.phone.trim(),
       email: input.email.trim(),
       taxId: input.taxId.trim(),
-    });
+    };
+    if (input.address !== undefined) payload.address = input.address.trim();
+    if (input.town !== undefined) payload.town = input.town.trim();
+    if (input.region !== undefined) payload.region = input.region.trim();
+    if (input.country !== undefined) payload.country = input.country.trim();
+    if (Array.isArray(input.propertyAmenities)) payload.propertyAmenities = input.propertyAmenities.filter((a) => typeof a === "string" && a.trim());
+    if (Array.isArray(input.photos)) payload.photos = input.photos.filter((a) => typeof a === "string" && a.trim());
+    await updateDoc(hotelDocRef(hotelId), payload);
     logAction(hotelId, "Hotel settings updated", "settings", hotelId, input.name.trim());
     return ok(null);
   } catch (err) {

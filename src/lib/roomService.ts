@@ -24,6 +24,15 @@ export interface RoomInventoryDoc {
   type?: string;
   price?: number;
   status: string;
+  capacity?: number | null;
+  adultsAllowed?: number | null;
+  childrenAllowed?: number | null;
+  bedConfiguration?: string;
+  description?: string;
+  amenities?: string[];
+  images?: string[];
+  restrictions?: string;
+  bookingConditions?: string;
 }
 
 export function isRoomStatus(value: string): value is RoomStatus {
@@ -41,6 +50,15 @@ export async function loadRooms(hotelId: string): Promise<RoomInventoryDoc[]> {
       type: typeof data.type === "string" ? data.type : undefined,
       price: typeof data.price === "number" ? data.price : undefined,
       status: String(data.status ?? "Available"),
+      capacity: typeof data.capacity === "number" ? data.capacity : null,
+      adultsAllowed: typeof data.adultsAllowed === "number" ? data.adultsAllowed : null,
+      childrenAllowed: typeof data.childrenAllowed === "number" ? data.childrenAllowed : null,
+      bedConfiguration: typeof data.bedConfiguration === "string" ? data.bedConfiguration : undefined,
+      description: typeof data.description === "string" ? data.description : undefined,
+      amenities: Array.isArray(data.amenities) ? data.amenities.filter((a) => typeof a === "string") : [],
+      images: Array.isArray(data.images) ? data.images.filter((a) => typeof a === "string") : [],
+      restrictions: typeof data.restrictions === "string" ? data.restrictions : undefined,
+      bookingConditions: typeof data.bookingConditions === "string" ? data.bookingConditions : undefined,
     };
   });
   rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
@@ -65,12 +83,21 @@ export interface AddRoomInput {
   status: RoomStatus;
   /** Existing inventory, used to reject a duplicate room number. */
   existingRooms: RoomInventoryDoc[];
+  capacity?: number | null;
+  adultsAllowed?: number | null;
+  childrenAllowed?: number | null;
+  bedConfiguration?: string;
+  description?: string;
+  amenities?: string[];
+  images?: string[];
+  restrictions?: string;
+  bookingConditions?: string;
 }
 
 export async function addRoom(input: AddRoomInput): Promise<ServiceResult<{ id: string }>> {
   const number = input.number.trim();
   if (!number) return fail("Enter a room number.");
-  if (input.existingRooms.some((room) => room.number === number)) {
+  if (input.existingRooms.some((room) => room.number.toLowerCase() === number.toLowerCase())) {
     return fail(`Room ${number} already exists.`);
   }
   const rateError = input.price === undefined ? null : roomRateError(input.price);
@@ -83,6 +110,15 @@ export async function addRoom(input: AddRoomInput): Promise<ServiceResult<{ id: 
       price: input.price || 0,
       status: input.status,
       hotelId: input.hotelId,
+      ...(input.capacity !== undefined && input.capacity !== null ? { capacity: input.capacity } : {}),
+      ...(input.adultsAllowed !== undefined && input.adultsAllowed !== null ? { adultsAllowed: input.adultsAllowed } : {}),
+      ...(input.childrenAllowed !== undefined && input.childrenAllowed !== null ? { childrenAllowed: input.childrenAllowed } : {}),
+      ...(input.bedConfiguration ? { bedConfiguration: input.bedConfiguration } : {}),
+      ...(input.description ? { description: input.description } : {}),
+      ...(Array.isArray(input.amenities) && input.amenities.length > 0 ? { amenities: input.amenities } : {}),
+      ...(Array.isArray(input.images) && input.images.length > 0 ? { images: input.images } : {}),
+      ...(input.restrictions ? { restrictions: input.restrictions } : {}),
+      ...(input.bookingConditions ? { bookingConditions: input.bookingConditions } : {}),
       createdAt: serverTimestamp(),
     });
     logAction(input.hotelId, "Room added", "room", ref.id, `${number} (${input.type})`);
@@ -97,14 +133,19 @@ export interface RoomChanges {
   number?: string;
   type: string;
   price: number | undefined;
+  capacity?: number | null;
+  adultsAllowed?: number | null;
+  childrenAllowed?: number | null;
+  bedConfiguration?: string;
+  description?: string;
+  amenities?: string[];
+  images?: string[];
+  restrictions?: string;
+  bookingConditions?: string;
 }
 
 /**
- * Edits a room's type and nightly rate in place.
- *
- * Only those two fields are written, so the room keeps its id, number,
- * status and every other field. A no-op (reported as success) when nothing
- * actually changed.
+ * Edits a room's details in place.
  */
 export async function updateRoom(
   hotelId: string,
@@ -122,10 +163,32 @@ export async function updateRoom(
   if (rateError) return fail(rateError);
   const price = changes.price as number;
 
-  if (room.number === number && room.type === type && room.price === price) return ok({ changed: false });
+  const updateData: Record<string, unknown> = { number, type, price };
+  if (changes.capacity !== undefined) updateData.capacity = changes.capacity;
+  if (changes.adultsAllowed !== undefined) updateData.adultsAllowed = changes.adultsAllowed;
+  if (changes.childrenAllowed !== undefined) updateData.childrenAllowed = changes.childrenAllowed;
+  if (changes.bedConfiguration !== undefined) updateData.bedConfiguration = changes.bedConfiguration;
+  if (changes.description !== undefined) updateData.description = changes.description;
+  if (changes.amenities !== undefined) updateData.amenities = changes.amenities;
+  if (changes.images !== undefined) updateData.images = changes.images;
+  if (changes.restrictions !== undefined) updateData.restrictions = changes.restrictions;
+  if (changes.bookingConditions !== undefined) updateData.bookingConditions = changes.bookingConditions;
+
+  const hasChanges = room.number !== number || room.type !== type || room.price !== price ||
+    JSON.stringify(room.capacity) !== JSON.stringify(updateData.capacity) ||
+    JSON.stringify(room.adultsAllowed) !== JSON.stringify(updateData.adultsAllowed) ||
+    JSON.stringify(room.childrenAllowed) !== JSON.stringify(updateData.childrenAllowed) ||
+    room.bedConfiguration !== changes.bedConfiguration ||
+    room.description !== changes.description ||
+    JSON.stringify(room.amenities) !== JSON.stringify(changes.amenities) ||
+    JSON.stringify(room.images) !== JSON.stringify(changes.images) ||
+    room.restrictions !== changes.restrictions ||
+    room.bookingConditions !== changes.bookingConditions;
+
+  if (!hasChanges) return ok({ changed: false });
 
   try {
-    await updateDoc(hotelDoc(hotelId, COLLECTIONS.ROOMS, room.id), { number, type, price });
+    await updateDoc(hotelDoc(hotelId, COLLECTIONS.ROOMS, room.id), updateData);
     logAction(
       hotelId,
       "Room updated",

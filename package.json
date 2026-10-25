@@ -31,6 +31,7 @@
     "verify:release": "npm run build && node scripts/verify/release-check.mjs",
     "seed:emulator": "tsx scripts/verify/seed-emulator-demo.ts",
     "seed:k-hotels": "tsx scripts/seed/k-hotels.ts",
+    "seed:ugandan-demo": "tsx scripts/seed/ugandan-demo-hotels.ts",
     "electron:dev": "vite --port 5173"
   },
   "build": {

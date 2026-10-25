@@ -90,6 +90,15 @@ interface Room {
   type: string;
   price?: number;
   status: RoomStatus;
+  capacity?: number | null;
+  adultsAllowed?: number | null;
+  childrenAllowed?: number | null;
+  bedConfiguration?: string;
+  description?: string;
+  amenities?: string[];
+  images?: string[];
+  restrictions?: string;
+  bookingConditions?: string;
 }
 
 /** Adapts this page's Room rows to the room service's document shape. */
@@ -99,6 +108,15 @@ const toRoomInventory = (room: Room) => ({
   type: room.type,
   price: room.price,
   status: room.status,
+  capacity: room.capacity ?? null,
+  adultsAllowed: room.adultsAllowed ?? null,
+  childrenAllowed: room.childrenAllowed ?? null,
+  bedConfiguration: room.bedConfiguration,
+  description: room.description,
+  amenities: Array.isArray(room.amenities) ? room.amenities : [],
+  images: Array.isArray(room.images) ? room.images : [],
+  restrictions: room.restrictions,
+  bookingConditions: room.bookingConditions,
 });
 
 /** Shared derivation (lib/metrics) keeps this page consistent with dashboards. */
@@ -327,14 +345,14 @@ export default function AccommodationDashboard() {
 
   const openAddRoom = () => {
     setEditingRoom(null);
-    setRoomForm({ number: "", type: "Single", status: "Available" });
+    setRoomForm({ number: "", type: "Single", status: "Available", capacity: null, adultsAllowed: null, childrenAllowed: null, bedConfiguration: "", description: "", amenities: [], images: [], restrictions: "", bookingConditions: "" } as any);
     setRoomError("");
     setRoomModalOpen(true);
   };
 
   const openEditRoom = (room: Room) => {
     setEditingRoom(room);
-    setRoomForm({ number: room.number, type: room.type, price: room.price, status: room.status });
+    setRoomForm({ number: room.number, type: room.type, price: room.price, status: room.status, capacity: room.capacity ?? null, adultsAllowed: room.adultsAllowed ?? null, childrenAllowed: room.childrenAllowed ?? null, bedConfiguration: room.bedConfiguration ?? "", description: room.description ?? "", amenities: Array.isArray(room.amenities) ? room.amenities : [], images: Array.isArray(room.images) ? room.images : [], restrictions: room.restrictions ?? "", bookingConditions: room.bookingConditions ?? "" } as any);
     setRoomError("");
     setRoomModalOpen(true);
   };
@@ -347,31 +365,61 @@ export default function AccommodationDashboard() {
     e.preventDefault();
     setRoomError("");
 
+    const rf: any = roomForm as any;
+    const amenitiesArr = Array.isArray(rf.amenities)
+      ? rf.amenities.filter((a: any) => typeof a === "string" && a.trim())
+      : typeof rf.amenities === "string"
+      ? rf.amenities.split(",").map((a: string) => a.trim()).filter(Boolean)
+      : [];
+    const imagesArr = Array.isArray(rf.images)
+      ? rf.images.filter((a: any) => typeof a === "string" && a.trim())
+      : typeof rf.images === "string"
+      ? rf.images.split(",").map((a: string) => a.trim()).filter(Boolean)
+      : [];
+
     if (editingRoom) {
       if (!hotelId || !editingRoom.id) return setRoomError("No workspace is open. Reload the page and try again.");
       const result = await updateRoomService(hotelId, toRoomInventory(editingRoom), {
-        number: roomForm.number,
-        type: roomForm.type,
-        price: roomForm.price,
-      });
+        number: rf.number,
+        type: rf.type,
+        price: rf.price,
+        capacity: rf.capacity === "" || rf.capacity === undefined ? null : Number(rf.capacity),
+        adultsAllowed: rf.adultsAllowed === "" || rf.adultsAllowed === undefined ? null : Number(rf.adultsAllowed),
+        childrenAllowed: rf.childrenAllowed === "" || rf.childrenAllowed === undefined ? null : Number(rf.childrenAllowed),
+        bedConfiguration: rf.bedConfiguration || undefined,
+        description: rf.description || undefined,
+        amenities: amenitiesArr,
+        images: imagesArr,
+        restrictions: rf.restrictions || undefined,
+        bookingConditions: rf.bookingConditions || undefined,
+      } as any);
       if (!result.ok) return setRoomError(result.error);
       if (result.data.changed) toast.success(`Room ${editingRoom.number} updated`);
       closeRoomModal();
       return;
     }
 
-    const number = roomForm.number.trim();
+    const number = String(rf.number || "").trim();
     if (!number) return setRoomError("Enter a room name or number.");
     if (!hotelId) return setRoomError("No workspace is open. Reload the page and try again.");
 
     const result = await addRoomService({
       hotelId,
       number,
-      type: roomForm.type,
-      price: roomForm.price,
-      status: roomForm.status,
+      type: rf.type,
+      price: rf.price,
+      status: rf.status,
       existingRooms: rooms.map(toRoomInventory),
-    });
+      capacity: rf.capacity === "" || rf.capacity === undefined ? null : Number(rf.capacity),
+      adultsAllowed: rf.adultsAllowed === "" || rf.adultsAllowed === undefined ? null : Number(rf.adultsAllowed),
+      childrenAllowed: rf.childrenAllowed === "" || rf.childrenAllowed === undefined ? null : Number(rf.childrenAllowed),
+      bedConfiguration: rf.bedConfiguration || undefined,
+      description: rf.description || undefined,
+      amenities: amenitiesArr,
+      images: imagesArr,
+      restrictions: rf.restrictions || undefined,
+      bookingConditions: rf.bookingConditions || undefined,
+    } as any);
 
     if (!result.ok) return setRoomError(result.error);
     toast.success(`Room ${number} added`);
@@ -801,7 +849,7 @@ export default function AccommodationDashboard() {
             onClick={closeRoomModal}
           >
             <motion.div
-              className="modal-panel max-w-md"
+              className="modal-panel max-w-2xl"
               initial={{ y: 24, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 24, opacity: 0 }}
@@ -818,22 +866,72 @@ export default function AccommodationDashboard() {
                 </button>
               </div>
 
-              <form className="p-6 space-y-4" onSubmit={handleRoomSubmit}>
-                <div>
-                  <label className="field-label">Room name or number<span className="req">*</span></label>
-                  <input type="text" placeholder="e.g. 101, Garden Room, Lake View 2" value={roomForm.number} onChange={(e) => setRoomForm((p) => ({ ...p, number: e.target.value }))} required className="input" />
+              <form className="p-6 space-y-4 max-h-[80vh] overflow-y-auto" onSubmit={handleRoomSubmit}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="field-label">Room name or number<span className="req">*</span></label>
+                    <input type="text" placeholder="e.g. 101, Garden Room, Lake View 2" value={(roomForm as any).number || ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, number: e.target.value }))} required className="input" />
+                  </div>
+                  <div>
+                    <label className="field-label">Room type</label>
+                    <select value={(roomForm as any).type} onChange={(e) => setRoomForm((p: any) => ({ ...p, type: e.target.value }))} className="select">
+                      {/* A legacy room may carry a type outside today's list; keep it selectable. */}
+                      {(ROOM_TYPES as readonly string[]).includes((roomForm as any).type) ? null : <option value={(roomForm as any).type}>{(roomForm as any).type}</option>}
+                      {ROOM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="field-label">Nightly rate ({currency}){editingRoom && <span className="req">*</span>}</label>
+                    <input type="number" placeholder="0" value={(roomForm as any).price ?? ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, price: e.target.value === "" ? undefined : Number(e.target.value) }))} min={0} step="any" required={!!editingRoom} className="input" />
+                  </div>
+                  <div>
+                    <label className="field-label">Status</label>
+                    <select value={(roomForm as any).status} onChange={(e) => setRoomForm((p: any) => ({ ...p, status: e.target.value }))} className="select">
+                      {ROOM_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="field-label">Capacity (guests)</label>
+                    <input type="number" placeholder="e.g. 2" value={(roomForm as any).capacity ?? ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, capacity: e.target.value === "" ? null : Number(e.target.value) }))} min={1} className="input" />
+                  </div>
+                  <div>
+                    <label className="field-label">Adults allowed</label>
+                    <input type="number" placeholder="e.g. 2" value={(roomForm as any).adultsAllowed ?? ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, adultsAllowed: e.target.value === "" ? null : Number(e.target.value) }))} min={0} className="input" />
+                  </div>
+                  <div>
+                    <label className="field-label">Children allowed</label>
+                    <input type="number" placeholder="e.g. 1" value={(roomForm as any).childrenAllowed ?? ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, childrenAllowed: e.target.value === "" ? null : Number(e.target.value) }))} min={0} className="input" />
+                  </div>
                 </div>
                 <div>
-                  <label className="field-label">Room type</label>
-                  <select value={roomForm.type} onChange={(e) => setRoomForm((p) => ({ ...p, type: e.target.value }))} className="select">
-                    {/* A legacy room may carry a type outside today's list; keep it selectable. */}
-                    {(ROOM_TYPES as readonly string[]).includes(roomForm.type) ? null : <option value={roomForm.type}>{roomForm.type}</option>}
-                    {ROOM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                  <label className="field-label">Bed configuration</label>
+                  <input type="text" placeholder="e.g. 1 King + 1 Sofa bed" value={(roomForm as any).bedConfiguration || ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, bedConfiguration: e.target.value }))} className="input" />
                 </div>
                 <div>
-                  <label className="field-label">Nightly rate ({currency}){editingRoom && <span className="req">*</span>}</label>
-                  <input type="number" placeholder="0" value={roomForm.price ?? ""} onChange={(e) => setRoomForm((p) => ({ ...p, price: e.target.value === "" ? undefined : Number(e.target.value) }))} min={0} step="any" required={!!editingRoom} className="input" />
+                  <label className="field-label">Description</label>
+                  <textarea placeholder="Room description" value={(roomForm as any).description || ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, description: e.target.value }))} className="textarea" />
+                </div>
+                <div>
+                  <label className="field-label">Amenities (comma separated)</label>
+                  <input type="text" placeholder="e.g. Wi-Fi, TV, Balcony" value={Array.isArray((roomForm as any).amenities) ? (roomForm as any).amenities.join(", ") : ((roomForm as any).amenities || "")} onChange={(e) => setRoomForm((p: any) => ({ ...p, amenities: e.target.value }))} className="input" />
+                </div>
+                <div>
+                  <label className="field-label">Images (comma separated URLs)</label>
+                  <input type="text" placeholder="https://..., https://..." value={Array.isArray((roomForm as any).images) ? (roomForm as any).images.join(", ") : ((roomForm as any).images || "")} onChange={(e) => setRoomForm((p: any) => ({ ...p, images: e.target.value }))} className="input" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="field-label">Restrictions</label>
+                    <input type="text" placeholder="e.g. No smoking" value={(roomForm as any).restrictions || ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, restrictions: e.target.value }))} className="input" />
+                  </div>
+                  <div>
+                    <label className="field-label">Booking conditions</label>
+                    <input type="text" placeholder="e.g. Free cancellation" value={(roomForm as any).bookingConditions || ""} onChange={(e) => setRoomForm((p: any) => ({ ...p, bookingConditions: e.target.value }))} className="input" />
+                  </div>
                 </div>
 
                 {roomError && (
