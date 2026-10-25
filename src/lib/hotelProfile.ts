@@ -28,8 +28,6 @@ export interface HotelProfile extends HotelListing {
   /** Address, town/city, region and country details */
   address?: string;
   town?: string;
-  region?: string;
-  country?: string;
   /** ISO-ish currency code used for every amount shown in the app. */
   currency: string;
   phone: string;
@@ -99,8 +97,6 @@ function toProfile(data: Record<string, unknown> | undefined): HotelProfile {
     location: String(data.location ?? ""),
     address: typeof data.address === "string" ? data.address : undefined,
     town: typeof data.town === "string" ? data.town : undefined,
-    region: typeof data.region === "string" ? data.region : (data as any).region || undefined,
-    country: typeof data.country === "string" ? data.country : undefined,
     currency: String(data.currency ?? DEFAULT_CURRENCY) || DEFAULT_CURRENCY,
     phone: String(data.phone ?? ""),
     email: String(data.email ?? ""),

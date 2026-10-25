@@ -81,13 +81,13 @@ export function validateBusinessStep(input: WorkspaceSetupInput): SetupErrors {
  * itself, which is where every screen already reads pricing from.
  */
 const STARTING_RATES: Record<string, Record<RoomType, number>> = {
-  UGX: { Single: 150_000, Double: 220_000, Suite: 420_000 },
-  KES: { Single: 5_500, Double: 8_000, Suite: 15_000 },
-  TZS: { Single: 100_000, Double: 150_000, Suite: 280_000 },
-  RWF: { Single: 55_000, Double: 80_000, Suite: 150_000 },
-  USD: { Single: 45, Double: 65, Suite: 120 },
-  EUR: { Single: 42, Double: 60, Suite: 110 },
-  GBP: { Single: 36, Double: 52, Suite: 95 },
+  UGX: { Single: 150_000, Double: 220_000, Twin: 220_000, "Family Room": 320_000, "Deluxe Room": 280_000, Suite: 420_000 },
+  KES: { Single: 5_500, Double: 8_000, Twin: 8_000, "Family Room": 12_000, "Deluxe Room": 10_000, Suite: 15_000 },
+  TZS: { Single: 100_000, Double: 150_000, Twin: 150_000, "Family Room": 230_000, "Deluxe Room": 190_000, Suite: 280_000 },
+  RWF: { Single: 55_000, Double: 80_000, Twin: 80_000, "Family Room": 120_000, "Deluxe Room": 100_000, Suite: 150_000 },
+  USD: { Single: 45, Double: 65, Twin: 65, "Family Room": 95, "Deluxe Room": 80, Suite: 120 },
+  EUR: { Single: 42, Double: 60, Twin: 60, "Family Room": 88, "Deluxe Room": 74, Suite: 110 },
+  GBP: { Single: 36, Double: 52, Twin: 52, "Family Room": 76, "Deluxe Room": 64, Suite: 95 },
 };
 
 export function startingRates(currency: string): Record<RoomType, number> {

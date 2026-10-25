@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom";
-import { BedDouble, CalendarCheck, MessagesSquare, Sparkles, ArrowRight, ClipboardCheck, AlertCircle, Users, TrendingUp } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { BedDouble, CalendarCheck, MessagesSquare, Sparkles, ArrowRight, ClipboardCheck, AlertCircle, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
 import { onSnapshot, query } from "firebase/firestore";
 import { useHotelProfile } from "../lib/hotelProfile";
 import { useWorkspace } from "../workspace/workspaceContext";
 import { PageHeader } from "../components/ui";
 import { hotelCollection } from "../lib/hotelScope";
 import { COLLECTIONS } from "../lib/collections";
-import { db } from "../../firebase";
+
 
 const actions = [
   {
@@ -84,7 +84,6 @@ export default function Dashboard() {
     }
 
     setLoading(true);
-    const now = Date.now();
     const start24h = getStartOfDay().getTime();
     const start7d = getDaysAgo(7).getTime();
 
