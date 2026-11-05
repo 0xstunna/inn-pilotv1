@@ -3,26 +3,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { getDoc } from "firebase/firestore";
 import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  CalendarCheck,
-  Beer,
-  Receipt,
-  BarChart3,
   ArrowRight,
   ChevronDown,
   Mail,
   MapPin,
-  Zap,
-  Layers,
-  GraduationCap,
   Wallet,
-  CheckCircle2,
   KeyRound,
   Sparkles,
+  Zap,
+  Bot,
+  Headset,
+  Clock,
+  BedDouble,
+  LayoutDashboard,
 } from "lucide-react";
 
 import innpilotLogoLight from "../assets/brand/innpilot-logo-full-light.png";
@@ -84,7 +77,7 @@ function OpenWorkspace() {
             <KeyRound size={16} className="text-[var(--primary)]" /> Open your workspace
           </p>
           <p className="text-xs text-slate-500 mt-1 mb-3">
-            Hotel staff: paste your workspace ID to manage reservations and answer guests in the AI inbox.
+            Hotel staff: paste your workspace ID to manage your AI Concierge inbox, rooms and reservations.
           </p>
           <label htmlFor="workspace-id" className="sr-only">
             Workspace ID
@@ -123,12 +116,12 @@ const fadeUp = {
    Feature grid
    ------------------------------------------------------------ */
 const features: { icon: React.ReactNode; title: string; description: string }[] = [
-  { icon: <Wallet size={20} />, title: "Daily financial dashboard", description: "Revenue, net profit, expenses and occupancy for today, this week or this month, on one screen." },
-  { icon: <CalendarCheck size={20} />, title: "Rooms & reservations", description: "Track bookings from confirmation to check-out with live availability, so no room is ever double-booked." },
-  { icon: <Beer size={20} />, title: "Bar POS & stock control", description: "Ring up sales, watch margin per product, and move stock from the main store to the bar without it ever going negative." },
-  { icon: <Receipt size={20} />, title: "Every department's takings", description: "Restaurant orders, bar sales, parking fees and expenses land in one set of figures that always agree." },
-  { icon: <Zap size={20} />, title: "Set up in under a minute", description: "Create your hotel's workspace, get a ready-made room inventory with nightly rates, and take your first booking. No sign-up, no installation." },
-  { icon: <BarChart3 size={20} />, title: "Daily, weekly & monthly reports", description: "Revenue by department, net profit and best-selling products, ready to print or export to PDF and CSV." },
+  { icon: <Bot size={20} />, title: "AI Concierge for guests", description: "Answers guest messages, checks availability and takes bookings 24/7 — every chat lands in your inbox." },
+  { icon: <Headset size={20} />, title: "Staff inbox", description: "Every guest conversation in one place. Take over any thread, reply, or hand it back to the AI." },
+  { icon: <BedDouble size={20} />, title: "Rooms & reservations", description: "Track bookings from confirmation to check-out with live availability, so no room is ever double-booked." },
+  { icon: <LayoutDashboard size={20} />, title: "Dashboard with AI metrics", description: "AI-sourced bookings, revenue, inquiry-to-booking conversion and average response time — all owner-facing." },
+  { icon: <Clock size={20} />, title: "Set up in under a minute", description: "Create your hotel's workspace, get a ready-made room inventory with nightly rates, and take your first booking. No sign-up, no installation." },
+  { icon: <Wallet size={20} />, title: "Honest payments", description: "Guests pay at the hotel on arrival. No fake deposit buttons, no hidden payment claims." },
 ];
 
 /* ------------------------------------------------------------
@@ -136,8 +129,8 @@ const features: { icon: React.ReactNode; title: string; description: string }[] 
    ------------------------------------------------------------ */
 const valueProps: { icon: React.ReactNode; title: string; description: string }[] = [
   { icon: <Zap size={20} />, title: "Built for how you actually run a hotel", description: "Not a scaled-down enterprise suite. InnPilot is sized, priced and designed for independent properties." },
-  { icon: <Layers size={20} />, title: "One platform instead of five", description: "Rooms, restaurant, bar, parking, expenses and reporting live in a single system your whole team shares." },
-  { icon: <GraduationCap size={20} />, title: "Your team is productive on day one", description: "A clean, focused interface means front desk and floor staff need minutes, not weeks, to get comfortable." },
+  { icon: <Bot size={20} />, title: "AI Concierge, not just a chat widget", description: "Guests get real availability, real prices and confirmed bookings — not a form they never hear back from." },
+  { icon: <Headset size={20} />, title: "Your team stays in control", description: "Every guest conversation lands in your inbox. Take over any thread, reply, or hand it back to the AI." },
   { icon: <Wallet size={20} />, title: "Priced for independent operations", description: "No enterprise contracts or per-module upsells. Straightforward pricing that scales with your property." },
 ];
 
@@ -148,163 +141,9 @@ const faqs: { q: string; a: string }[] = [
   { q: "Do I need to create an account?", a: "No. Click Get Started, tell us about your hotel and your workspace is ready straight away. There is no sign-up and no password." },
   { q: "What do I get when I create a workspace?", a: "A dashboard for your hotel with a starting room inventory and nightly rates in your currency, so you can take a reservation immediately. Add rooms any time from Accommodation." },
   { q: "How long does setup take?", a: "Under a minute. Name your hotel, add your contact details and how many rooms you have, and InnPilot builds your workspace." },
-  { q: "Do you publish pricing?", a: "Every workspace starts on a free trial. When you're ready for a paid plan, we scope pricing to your property's size and send a straightforward quote." },
+  { q: "Do you publish pricing?", a: "Every workspace starts on a free trial. Pricing is straightforward and scales with your property — no enterprise contracts or per-module upsells." },
   { q: "Does InnPilot work if my internet connection is unreliable?", a: "InnPilot is a cloud-based platform designed to stay fast and responsive on the connectivity typical of independent hotels." },
 ];
-
-/* ------------------------------------------------------------
-   Product showcase mocks
-   ------------------------------------------------------------ */
-const occupancyTrend = [
-  { day: "Mon", value: 58 },
-  { day: "Tue", value: 62 },
-  { day: "Wed", value: 71 },
-  { day: "Thu", value: 68 },
-  { day: "Fri", value: 82 },
-  { day: "Sat", value: 91 },
-  { day: "Sun", value: 87 },
-];
-
-const DashboardPreview = () => (
-  <div className="rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-[#0b1220] w-full">
-    <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/10">
-      <span className="w-2.5 h-2.5 rounded-full bg-white/20" />
-      <span className="w-2.5 h-2.5 rounded-full bg-white/20" />
-      <span className="w-2.5 h-2.5 rounded-full bg-white/20" />
-      <span className="ml-3 text-[11px] text-[#8b97ad]">innpilot.app/dashboard</span>
-    </div>
-    <div className="flex">
-      <div className="w-40 border-r border-white/10 py-4 px-3 space-y-1 hidden sm:block">
-        {[
-          { label: "Dashboard", active: true },
-          { label: "Accommodation" },
-          { label: "Restaurant" },
-          { label: "Bar" },
-          { label: "Parking" },
-          { label: "Reports" },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className={`text-[12px] px-3 py-2 rounded-lg ${
-              item.active ? "bg-[rgba(45,212,200,0.16)] text-white font-medium" : "text-[#8b97ad]"
-            }`}
-          >
-            {item.label}
-          </div>
-        ))}
-      </div>
-      <div className="flex-1 p-4 sm:p-5 space-y-3 bg-[#f5f7fa]">
-        <div className="text-slate-800 font-semibold text-sm mb-1">Overview</div>
-        <div className="grid grid-cols-3 gap-2">
-          {["Occupancy", "Arrivals today", "Open orders"].map((label) => (
-            <div key={label} className="bg-white rounded-lg p-3 border border-slate-200">
-              <div className="text-[10px] text-slate-400 mb-1">{label}</div>
-              <div className="h-2 w-10 rounded bg-[#0e93a3]/30" />
-            </div>
-          ))}
-        </div>
-        <div className="bg-white rounded-lg p-3 border border-slate-200">
-          <div className="text-[10px] text-slate-400 mb-2">Room board</div>
-          <div className="grid grid-cols-6 gap-1.5">
-            {Array.from({ length: 18 }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-4 rounded ${i % 5 === 0 ? "bg-[#0e93a3]/40" : "bg-slate-100"}`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const ReservationCalendarMock = () => {
-  const rooms = ["101", "102", "103", "104"];
-  const days = 7;
-  // deterministic-looking "reservation bars" per room
-  const bars: Record<string, [number, number]> = {
-    "101": [0, 3],
-    "102": [2, 5],
-    "103": [1, 2],
-    "104": [4, 7],
-  };
-  return (
-    <div className="card p-4 sm:p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-slate-800 text-sm">Reservation calendar</h3>
-        <span className="text-[11px] text-slate-400">This week</span>
-      </div>
-      <div className="space-y-2">
-        {rooms.map((room) => {
-          const [start, end] = bars[room];
-          return (
-            <div key={room} className="flex items-center gap-2">
-              <span className="w-9 text-[11px] text-slate-400 shrink-0">{room}</span>
-              <div className="relative flex-1 h-5 rounded bg-slate-100 grid" style={{ gridTemplateColumns: `repeat(${days}, 1fr)` }}>
-                {Array.from({ length: days }).map((_, i) => (
-                  <div key={i} className={i > 0 ? "border-l border-slate-200" : ""} />
-                ))}
-                <div
-                  className="absolute top-0.5 bottom-0.5 rounded"
-                  style={{
-                    left: `${(start / days) * 100}%`,
-                    width: `${((end - start) / days) * 100}%`,
-                    background: "var(--primary)",
-                    opacity: 0.75,
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-const OccupancyAnalyticsCards = () => (
-  <div className="grid grid-cols-2 gap-3">
-    <div className="card p-4 sm:p-5">
-      <div className="text-[11px] text-slate-400 mb-1">Occupancy this week</div>
-      <div className="text-2xl font-bold text-slate-800 mb-2">78%</div>
-      <div className="h-14 -mx-1">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={occupancyTrend} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-            <defs>
-              <linearGradient id="occGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0e93a3" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#0e93a3" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area type="monotone" dataKey="value" stroke="#0e93a3" strokeWidth={2} fill="url(#occGradient)" />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-    <div className="card p-4 sm:p-5 flex flex-col justify-between">
-      <div>
-        <div className="text-[11px] text-slate-400 mb-1">Revenue today</div>
-        <div className="text-2xl font-bold text-slate-800">UGX 4.2M</div>
-      </div>
-      <div className="mt-3 space-y-1.5">
-        {[
-          { label: "Rooms", pct: 62 },
-          { label: "Restaurant", pct: 24 },
-          { label: "Events", pct: 14 },
-        ].map((row) => (
-          <div key={row.label} className="flex items-center gap-2 text-[11px] text-slate-500">
-            <span className="w-16 shrink-0">{row.label}</span>
-            <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: "var(--brand-cyan)" }} />
-            </div>
-            <span className="w-8 text-right">{row.pct}%</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
 
 /* ------------------------------------------------------------
    FAQ accordion
@@ -381,15 +220,16 @@ const LandingPage = () => {
         <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-2 gap-12 items-center">
           <motion.div initial="hidden" animate="show" variants={fadeUp}>
             <span className="inline-block text-xs font-semibold tracking-wide uppercase text-[var(--brand-cyan)] mb-4">
-              InnPilot for hotel teams
+              InnPilot AI Concierge
             </span>
             <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight mb-5">
-              The PMS behind the AI Concierge
+              The AI Concierge that books rooms for your hotel
             </h1>
             <p className="text-[var(--rail-text)] text-base sm:text-lg leading-relaxed mb-8 max-w-xl">
-              Your rooms, rates and availability power the AI Concierge guests book through.
-              Every booking lands in your reservations, every guest chat in your inbox, and your
-              team can step in at any moment. Set up in under a minute. No sign-up required.
+              Your guests get instant answers, availability checks and confirmed bookings — 24/7.
+              Every conversation lands in your staff inbox, every booking lands in your
+              reservations, and your team can step in at any moment. Set up in under a minute.
+              No sign-up required.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/staff/get-started" className="btn btn-primary px-6 py-3 text-sm inline-flex items-center gap-2">
@@ -403,9 +243,6 @@ const LandingPage = () => {
                 See how it works
               </a>
             </div>
-          </motion.div>
-          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.1 }}>
-            <DashboardPreview />
           </motion.div>
         </div>
       </section>
@@ -443,16 +280,68 @@ const LandingPage = () => {
       <section id="product" className="py-20" style={{ background: "var(--surface-muted)" }}>
         <div className="max-w-6xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="max-w-2xl mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">See InnPilot in action</h2>
-            <p className="text-slate-500">A live look at the dashboard, reservation calendar and analytics your team works from every day.</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">How it works</h2>
+            <p className="text-slate-500">From a guest's first message to a confirmed booking, everything in one place.</p>
           </motion.div>
-          <div className="grid lg:grid-cols-2 gap-5 items-start">
-            <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}>
-              <DashboardPreview />
+          <div className="grid lg:grid-cols-3 gap-6">
+            <motion.div
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              className="card p-6"
+            >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
+                <Bot size={20} />
+              </div>
+              <h3 className="font-semibold text-slate-800 mb-2">Guest chats with the AI Concierge</h3>
+              <p className="text-sm text-slate-500 leading-relaxed mb-4">
+                The guest asks about availability, gets real prices and room options, and confirms a booking —
+                all through the AI Concierge on your hotel's page.
+              </p>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--brand-cyan)]">
+                1 <ArrowRight size={12} />
+              </span>
             </motion.div>
-            <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} transition={{ delay: 0.1 }} className="space-y-4">
-              <ReservationCalendarMock />
-              <OccupancyAnalyticsCards />
+            <motion.div
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              transition={{ delay: 0.1 }}
+              className="card p-6"
+            >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
+                <Headset size={20} />
+              </div>
+              <h3 className="font-semibold text-slate-800 mb-2">Conversation lands in your inbox</h3>
+              <p className="text-sm text-slate-500 leading-relaxed mb-4">
+                Every guest thread appears in your staff inbox with the lead score, booking status and
+                suggested follow-ups. Take over any time to reply yourself.
+              </p>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--brand-cyan)]">
+                2 <ArrowRight size={12} />
+              </span>
+            </motion.div>
+            <motion.div
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true }}
+              variants={fadeUp}
+              transition={{ delay: 0.2 }}
+              className="card p-6"
+            >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
+                <BedDouble size={20} />
+              </div>
+              <h3 className="font-semibold text-slate-800 mb-2">Booking confirmed in Accommodation</h3>
+              <p className="text-sm text-slate-500 leading-relaxed mb-4">
+                Confirmed bookings appear in Accommodation with the guest details, dates and room type.
+                Guests pay at the hotel on arrival — no fake deposit buttons.
+              </p>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--brand-cyan)]">
+                3 <ArrowRight size={12} />
+              </span>
             </motion.div>
           </div>
         </div>
@@ -485,59 +374,27 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Pricing teaser */}
+      {/* Get Started */}
       <section id="pricing" className="py-20" style={{ background: "var(--rail)" }}>
         <div className="max-w-6xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="text-center max-w-xl mx-auto mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Simple, honest pricing</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Ready to run your hotel?</h2>
             <p className="text-[var(--rail-text)]">
-              Every hotel is different, so we scope pricing to your property rather than publish a one-size-fits-all number.
+              Create your workspace in under a minute. Your AI Concierge, staff inbox and
+              room inventory are ready straight away — no sign-up, no installation.
             </p>
           </motion.div>
-          <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            className="max-w-md mx-auto rounded-2xl p-[1px]"
-            style={{ background: "linear-gradient(135deg, var(--brand-cyan), transparent 60%)" }}
-          >
-            <div className="rounded-2xl p-8 text-center" style={{ background: "var(--rail-2)" }}>
-              <span className="inline-block text-xs font-semibold tracking-wide uppercase text-[var(--brand-cyan)] mb-2">
-                InnPilot for hotels
-              </span>
-              <h3 className="text-xl font-bold text-white mb-1">Custom plan</h3>
-              <p className="text-[var(--rail-text-muted)] text-sm mb-6">Priced by property count and room count.</p>
-              <ul className="text-left space-y-2.5 mb-8">
-                {[
-                  "Unlimited reservations & rooms",
-                  "Ready-made room inventory from day one",
-                  "Restaurant, bar & parking revenue",
-                  "Real-time reporting & analytics",
-                  "Free trial workspace, set up in seconds",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-[var(--rail-text)]">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[var(--brand-cyan)]" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex flex-col gap-2.5">
-                <Link
-                  to="/staff/get-started"
-                  className="btn btn-primary w-full py-3 text-sm inline-flex items-center justify-center gap-2"
-                >
-                  Get Started <ArrowRight size={16} />
-                </Link>
-                <a
-                  href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Contact sales — InnPilot")}`}
-                  className="w-full py-3 text-sm font-semibold rounded-lg border border-white/15 text-white hover:bg-white/5 transition"
-                >
-                  Contact Sales
-                </a>
-              </div>
-            </div>
-          </motion.div>
+          <div className="max-w-md mx-auto">
+            <Link
+              to="/staff/get-started"
+              className="btn btn-primary w-full py-3 text-sm inline-flex items-center justify-center gap-2"
+            >
+              Get Started <ArrowRight size={16} />
+            </Link>
+            <p className="text-sm text-[var(--rail-text-muted)] mt-4 text-center">
+              No account needed. Your workspace is remembered in this browser.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -578,7 +435,7 @@ const LandingPage = () => {
             <div>
               <img src={innpilotLogoLight} alt="InnPilot" className="h-8 w-auto object-contain mb-3" />
               <p className="text-sm text-slate-500 leading-relaxed max-w-xs">
-                The operating system for independent hotels and small hotel groups.
+                The AI Concierge for independent hotels — guest chats, staff inbox and room inventory in one workspace.
               </p>
             </div>
             <div>
@@ -612,7 +469,7 @@ const LandingPage = () => {
           </div>
           <div className="pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-xs text-slate-400">© {new Date().getFullYear()} InnPilot · Built by Masai Labs</p>
-            <p className="text-xs text-slate-400">Independent hotel management, simplified.</p>
+            <p className="text-xs text-slate-400">AI Concierge for independent hotels, simplified.</p>
           </div>
         </div>
       </footer>
