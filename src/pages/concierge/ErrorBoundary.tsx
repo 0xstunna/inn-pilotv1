@@ -10,7 +10,7 @@
  * failures at the `HotelConcierge` level. It wraps the live chat area,
  * so a crash in one message bubble never hides earlier messages.
  */
-import { Component, ErrorInfo, ReactNode, createElement } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -55,6 +55,6 @@ export class ErrorBoundary extends Component<Props, State> {
         </div>
       );
     }
-    return createElement(this.props.children);
+    return this.props.children;
   }
 }

@@ -338,9 +338,9 @@ export async function checkHealth(
       toContents([{ role: "user", content: "ping" }]),
       Date.now() + config.timeoutMs
     );
-    const candidate = response.candidates?.[0];
+    const candidate = response.response.candidates?.[0];
     if (!candidate) {
-      const blocked = response.promptFeedback?.blockReason;
+      const blocked = response.response.promptFeedback?.blockReason;
       throw new AiUnavailableError(
         `Gemini returned no candidate${blocked ? ` (blockReason: ${blocked})` : ""}.`
       );
