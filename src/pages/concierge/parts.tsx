@@ -224,7 +224,7 @@ export function ErrorNotice({ message, onRetry }: { message: string; onRetry?: (
         <p>{message}</p>
         {onRetry && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={onRetry}>
-            <RotateCcw size={14} /> Try again
+            <RotateCcw size={14} /> Send again
           </button>
         )}
       </div>

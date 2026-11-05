@@ -555,7 +555,7 @@ function ConciergeListingCard({ hotelId, profile }: { hotelId: string; profile: 
               <Globe size={14} /> Guests can find and book this hotel
             </span>
             <span className="block text-xs muted">
-              {hasPublicId ? "Include your live rooms in K Hotels AI Concierge searches." : "Create your concierge link above first."}
+              {hasPublicId ? "Include your live rooms in AI Concierge searches." : "Create your concierge link above first."}
             </span>
           </span>
         </label>

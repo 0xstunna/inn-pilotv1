@@ -85,7 +85,7 @@ export function SelectedHotelBadge({ conversation, hotelName }: { conversation: 
   return (
     <span
       className={`badge badge-plain ${here ? "badge-success" : "badge-neutral"}`}
-      title={here ? "The guest chose your hotel" : "The guest chose another K Hotels property"}
+      title={here ? "The guest chose your hotel" : "The guest chose another property"}
     >
       <Building2 size={12} /> {label}
     </span>

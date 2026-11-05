@@ -41,11 +41,11 @@ function WorkspaceUnavailable({ onRetry }: { onRetry: () => void }) {
         </div>
         <h1 className="text-lg font-semibold mb-2">We couldn't open your workspace</h1>
         <p className="text-sm muted mb-6">
-          InnPilot couldn't reach the server. Check your internet connection and try again —
+          InnPilot couldn't reach the server. Check your internet connection and reconnect —
           your hotel's data is safe.
         </p>
         <button className="btn btn-primary w-full" onClick={onRetry}>
-          Try again
+          Reconnect
         </button>
       </div>
     </div>

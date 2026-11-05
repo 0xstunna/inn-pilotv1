@@ -1,7 +1,7 @@
 /**
  * InnPilot AI Concierge — the public product.
  *
- *   /#/                     the network concierge: every participating K Hotels property
+ *   /#/                     the network concierge: every participating property
  *   /#/c/:publicHotelId     the same concierge on one hotel's own link
  *
  * A guest describes where and when they want to stay, sees real options from
@@ -125,7 +125,7 @@ function HotelConcierge({ publicHotelId }: { publicHotelId: string }) {
       .then((hotel) => setState({ status: "ready", hotel }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        const message = error instanceof Error ? error.message : "Something went wrong.";
+        const message = error instanceof Error ? error.message : "The concierge is having trouble. Send again.";
         setState(error instanceof ConciergeError && !error.retryable ? { status: "not-found" } : { status: "error", message });
       });
     return () => controller.abort();
@@ -459,7 +459,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
             )}
             {composer}
             <p className="text-[11px] muted mt-1.5 text-center">
-              Rooms, prices and bookings come live from {hotel ? hotel.name : "K Hotels"}' booking systems.
+              Rooms, prices and bookings come live from {hotel ? hotel.name : "InnPilot"}' booking systems.
             </p>
           </div>
         </main>
@@ -607,7 +607,7 @@ function Home({
               style={{ background: "rgba(45,212,200,0.14)", color: "var(--brand-cyan)", border: "1px solid rgba(45,212,200,0.3)" }}
             >
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--brand-cyan)" }} />
-              {hotel ? `${hotel.city ?? "Live"} · live rooms and prices` : "K Hotels · live rooms and prices"}
+              {hotel ? `${hotel.city ?? "Live"} · live rooms and prices` : "Live rooms and prices"}
             </p>
             <h1 className="font-poppins font-semibold text-white mt-5 text-4xl sm:text-6xl leading-[1.05] tracking-tight">
               {hotel ? (
@@ -623,7 +623,7 @@ function Home({
             <p className="mt-4 text-base sm:text-lg max-w-2xl" style={{ color: "var(--rail-text)" }}>
               {hotel
                 ? "Tell me when you'd like to stay. I'll check live availability, show you real prices and book your room in this chat."
-                : "Search available K Hotels with a simple conversation. Say where and when — I'll find real rooms at real prices and book the one you choose."}
+                : "Search available hotels with a simple conversation. Say where and when — I'll find real rooms at real prices and book the one you choose."}
             </p>
           </motion.div>
 
@@ -707,7 +707,7 @@ function Properties({ disabled, onSend }: { disabled: boolean; onSend: (text: st
         <div>
           <p className="eyebrow">Participating properties</p>
           <h2 id="properties-title" className="font-poppins text-2xl font-semibold mt-1" style={{ color: "var(--text)" }}>
-            One conversation, every K Hotels property
+            One conversation, every property
           </h2>
         </div>
         {hotels && <p className="text-sm muted">{hotels.length} hotels searched live</p>}
@@ -864,7 +864,7 @@ function NotFoundScreen() {
   return (
     <CenteredMessage icon={<SearchX size={22} />} title="We couldn't find this hotel">
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        This link doesn't match a hotel. You can still search every K Hotels property.
+        This link doesn't match a hotel. You can still search all hotels.
       </p>
       <Link to="/" className="btn btn-primary">
         <AssistantAvatar size={20} /> Search all hotels
@@ -880,7 +880,7 @@ function LoadErrorScreen({ message, onRetry }: { message: string; onRetry: () =>
         {message}
       </p>
       <button type="button" className="btn btn-primary" onClick={onRetry}>
-        Try again
+        Send again
       </button>
     </CenteredMessage>
   );

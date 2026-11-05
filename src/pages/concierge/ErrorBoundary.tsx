@@ -49,7 +49,7 @@ export class ErrorBoundary extends Component<Props, State> {
               The concierge hit an error. Your earlier messages are still here — send again to continue.
             </p>
             <button type="button" className="btn btn-primary" onClick={this.reset}>
-              Try again
+              Send again
             </button>
           </div>
         </div>
