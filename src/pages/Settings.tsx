@@ -94,6 +94,12 @@ export default function Settings() {
             phone: profile.phone,
             email: profile.email,
             taxId: profile.taxId,
+            address: (profile as any).address || "",
+            town: (profile as any).town || "",
+            region: (profile as any).region || profile.region || "",
+            country: (profile as any).country || "",
+            propertyAmenities: Array.isArray((profile as any).propertyAmenities) ? (profile as any).propertyAmenities : Array.isArray((profile as any).amenities) ? (profile as any).amenities : [],
+            photos: Array.isArray((profile as any).photos) ? (profile as any).photos : [],
           }
     );
   }, [profile, profileLoading]);
@@ -106,7 +112,13 @@ export default function Settings() {
       draft.currency !== profile.currency ||
       draft.phone !== profile.phone ||
       draft.email !== profile.email ||
-      draft.taxId !== profile.taxId
+      draft.taxId !== profile.taxId ||
+      (draft.address || "") !== ((profile as any).address || "") ||
+      (draft.town || "") !== ((profile as any).town || "") ||
+      (draft.region || "") !== ((profile as any).region || profile.region || "") ||
+      (draft.country || "") !== ((profile as any).country || "") ||
+      JSON.stringify(draft.propertyAmenities || []) !== JSON.stringify(((profile as any).propertyAmenities) || ((profile as any).amenities) || []) ||
+      JSON.stringify(draft.photos || []) !== JSON.stringify(((profile as any).photos) || [])
     );
   }, [draft, profile]);
 
@@ -219,6 +231,38 @@ export default function Settings() {
                     />
                   </Field>
 
+                  <Field label="Address">
+                    <input
+                      className="input"
+                      value={(draft as any).address || ""}
+                      onChange={(e) => setDraft({ ...(draft as any), address: e.target.value } as any)}
+                    />
+                  </Field>
+
+                  <Field label="Town/City">
+                    <input
+                      className="input"
+                      value={(draft as any).town || ""}
+                      onChange={(e) => setDraft({ ...(draft as any), town: e.target.value } as any)}
+                    />
+                  </Field>
+
+                  <Field label="Region">
+                    <input
+                      className="input"
+                      value={(draft as any).region || ""}
+                      onChange={(e) => setDraft({ ...(draft as any), region: e.target.value } as any)}
+                    />
+                  </Field>
+
+                  <Field label="Country">
+                    <input
+                      className="input"
+                      value={(draft as any).country || ""}
+                      onChange={(e) => setDraft({ ...(draft as any), country: e.target.value } as any)}
+                    />
+                  </Field>
+
                   <Field
                     label="Currency"
                     required
@@ -264,6 +308,22 @@ export default function Settings() {
                       />
                     </Field>
                   </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Property amenities (comma separated)">
+                    <input
+                      className="input"
+                      value={Array.isArray((draft as any).propertyAmenities) ? (draft as any).propertyAmenities.join(", ") : ((draft as any).propertyAmenities || "")}
+                      onChange={(e) => setDraft({ ...(draft as any), propertyAmenities: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) } as any)}
+                    />
+                  </Field>
+                  <Field label="Photos (comma separated URLs)">
+                    <input
+                      className="input"
+                      value={Array.isArray((draft as any).photos) ? (draft as any).photos.join(", ") : ((draft as any).photos || "")}
+                      onChange={(e) => setDraft({ ...(draft as any), photos: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) } as any)}
+                    />
+                  </Field>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-1">

@@ -24,17 +24,8 @@ const AppShell = lazy(() => import("./dashboard"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Inbox = lazy(() => import("./pages/inbox/Inbox"));
 const Accommodation = lazy(() => import("./Accommodation"));
-const Restaurant = lazy(() => import("./Restaurant"));
-const Expenses = lazy(() => import("./Expenses"));
-const Parking = lazy(() => import("./pages/Parking"));
-const Reports = lazy(() => import("./Reports"));
 const SettingsPage = lazy(() => import("./pages/Settings"));
 
-const BarLayout = lazy(() => import("./pages/bar/BarLayout"));
-const BarOverview = lazy(() => import("./pages/bar/BarOverview"));
-const BarProducts = lazy(() => import("./pages/bar/BarProducts"));
-const BarSales = lazy(() => import("./pages/bar/BarSales"));
-const BarTransfers = lazy(() => import("./pages/bar/BarTransfers"));
 
 /** Shown while a route's bundle is in flight. */
 function RouteFallback() {
@@ -99,16 +90,12 @@ function App() {
               <Route index element={<Dashboard />} />
               <Route path="inbox" element={<Inbox />} />
               <Route path="accommodation" element={<Accommodation />} />
-              <Route path="restaurant" element={<Restaurant />} />
-              <Route path="bar" element={<BarLayout />}>
-                <Route index element={<BarOverview />} />
-                <Route path="products" element={<BarProducts />} />
-                <Route path="sales" element={<BarSales />} />
-                <Route path="transfers" element={<BarTransfers />} />
-              </Route>
-              <Route path="parking" element={<Parking />} />
-              <Route path="expenses" element={<Expenses />} />
-              <Route path="reports" element={<Reports />} />
+              {/* Legacy operational modules are intentionally retired from the challenge MVP. */}
+              <Route path="restaurant/*" element={<Navigate to="/dashboard/accommodation" replace />} />
+              <Route path="bar/*" element={<Navigate to="/dashboard/accommodation" replace />} />
+              <Route path="parking/*" element={<Navigate to="/dashboard/accommodation" replace />} />
+              <Route path="expenses/*" element={<Navigate to="/dashboard/accommodation" replace />} />
+              <Route path="reports/*" element={<Navigate to="/dashboard/accommodation" replace />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 

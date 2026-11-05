@@ -33,7 +33,7 @@ export const ROOM_STATUSES: RoomStatus[] = ["Available", "Occupied", "Cleaning",
 export const ACTIVE_BOOKING_STATUSES: BookingStatus[] = ["Confirmed", "Checked In"];
 
 /** The room types a hotel can register, smallest to largest. */
-export const ROOM_TYPES = ["Single", "Double", "Suite"] as const;
+export const ROOM_TYPES = ["Single", "Double", "Twin", "Family Room", "Deluxe Room", "Suite"] as const;
 export type RoomType = (typeof ROOM_TYPES)[number];
 
 /** Every module that takes money accepts the same set of tenders. */

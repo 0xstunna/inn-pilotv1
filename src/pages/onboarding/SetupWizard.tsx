@@ -464,7 +464,7 @@ function BusinessStep({ form, errors, update }: StepProps) {
       <StepHeading
         icon={<Phone size={22} />}
         title="Business details"
-        subtitle="How guests reach you, and how many rooms you run."
+        subtitle="Contact details and a starting inventory. You can register your actual room names and types next."
       />
       <div className="space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -500,9 +500,9 @@ function BusinessStep({ form, errors, update }: StepProps) {
 
         <SetupField
           id="roomCount"
-          label="Number of rooms"
+          label="Starting room inventory size"
           error={errors.roomCount}
-          hint="We'll set up this many rooms with starting rates. You can add more later."
+          hint="This creates a starter inventory. After setup, open Accommodation to review each room name or number, assign its room type and set the correct nightly rate before accepting bookings."
         >
           <div className="flex items-center gap-2">
             <button
@@ -609,7 +609,7 @@ function ReviewStep({
       <div className="mt-5">
         <div className="flex items-center justify-between mb-2">
           <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-            {plural(form.roomCount, "room")} with starting rates
+            {plural(form.roomCount, "starter room")} (review before accepting bookings)
           </p>
           {editButton(1, "Edit number of rooms")}
         </div>
@@ -635,8 +635,7 @@ function ReviewStep({
           ))}
         </ul>
         <p className="text-xs muted mt-2">
-          Starting rates are a guide based on typical local prices. Add or change rooms any time
-          from Accommodation.
+          These are starter entries, not verified hotel inventory or guaranteed prices. Review room identifiers, types and nightly rates in Accommodation before publishing your concierge link.
         </p>
       </div>
     </>

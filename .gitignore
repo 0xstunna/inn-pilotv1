@@ -7,6 +7,9 @@ node_modules
 .env.*
 !.env.example
 
+secrets/
+*service-account*.json
+
 # Firebase Admin / Google service-account keys (full Firestore access).
 serviceAccountKey.json
 *serviceAccountKey*.json

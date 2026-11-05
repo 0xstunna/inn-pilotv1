@@ -7,20 +7,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  Beer,
   BedDouble,
   Check,
-  CircleParking,
   Copy,
-  DoorOpen,
   LayoutDashboard,
   Menu,
-  Receipt,
   Settings,
-  Utensils,
-  FileBarChart,
   MessagesSquare,
   X,
+  DoorOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Tippy from "@tippyjs/react";
@@ -44,11 +39,6 @@ const NAV: NavItem[] = [
   { icon: <LayoutDashboard size={19} />, label: "Dashboard", to: "/dashboard", end: true },
   { icon: <MessagesSquare size={19} />, label: "Inbox", to: "/dashboard/inbox" },
   { icon: <BedDouble size={19} />, label: "Accommodation", to: "/dashboard/accommodation" },
-  { icon: <Utensils size={19} />, label: "Restaurant", to: "/dashboard/restaurant" },
-  { icon: <Beer size={19} />, label: "Bar", to: "/dashboard/bar" },
-  { icon: <CircleParking size={19} />, label: "Parking", to: "/dashboard/parking" },
-  { icon: <Receipt size={19} />, label: "Expenses", to: "/dashboard/expenses" },
-  { icon: <FileBarChart size={19} />, label: "Reports", to: "/dashboard/reports" },
   { icon: <Settings size={19} />, label: "Settings", to: "/dashboard/settings" },
 ];
 
@@ -57,14 +47,9 @@ const NAV: NavItem[] = [
  * longest-prefix match, so /dashboard/bar/products still reads "Bar".
  */
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard": { title: "Dashboard", subtitle: "Today's money, at a glance" },
+  "/dashboard": { title: "Dashboard", subtitle: "Manage room inventory, guest inquiries and reservations" },
   "/dashboard/inbox": { title: "Inbox", subtitle: "Guest conversations from every channel" },
   "/dashboard/accommodation": { title: "Accommodation", subtitle: "Rooms, bookings and occupancy" },
-  "/dashboard/restaurant": { title: "Restaurant", subtitle: "Orders and dining revenue" },
-  "/dashboard/bar": { title: "Bar", subtitle: "Sales, products and stock" },
-  "/dashboard/parking": { title: "Parking", subtitle: "Vehicles on the lot and parking income" },
-  "/dashboard/expenses": { title: "Expenses", subtitle: "What the hotel is spending" },
-  "/dashboard/reports": { title: "Reports", subtitle: "Daily, weekly and monthly performance" },
   "/dashboard/settings": { title: "Settings", subtitle: "Hotel profile and activity" },
 };
 
