@@ -283,7 +283,8 @@ service cloud.firestore {
       // Web threads are written by the server; the workspace can add sample
       // threads for the MOCKED channels, take a thread over and reply.
       match /conversations/{conversationId} {
-        allow read: if true;
+        // A client may only read a conversation that belongs to this hotel.
+        allow read: if resource.data.hotelId == hotelId;
         allow create: if workspaceWrite(hotelId) && conversationOk();
         // The channel a thread arrived on never changes.
         allow update: if workspaceWrite(hotelId) && conversationOk()
@@ -292,7 +293,7 @@ service cloud.firestore {
 
         // The thread itself: written once, never edited or removed.
         match /messages/{messageId} {
-          allow read: if true;
+          allow read: if resource.data.hotelId == hotelId;
           allow create: if workspaceExistsAfter(hotelId)
             && fieldsOk()
             && tenantFieldOk(hotelId)
