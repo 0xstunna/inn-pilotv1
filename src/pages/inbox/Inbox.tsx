@@ -20,25 +20,36 @@ import { Archive, ArchiveRestore, ArrowLeft, BellRing, Bot, Headset, Inbox as In
 import { useWorkspace } from "../../workspace/workspaceContext";
 import { useHotelProfile } from "../../lib/hotelProfile";
 import {
+  attentionCounts,
   channelCounts,
   CHANNEL_LABEL,
   CHANNELS,
+  CONVERSATION_STATUSES,
   filterConversations,
   leadCounts,
   LEAD_LABEL,
   LEAD_SCORES,
   MAX_MESSAGE_TEXT,
-  CONVERSATION_STATUSES,
+  pipelineCounts,
+  PIPELINE_STAGE_LABEL,
+  PIPELINE_STAGES,
+  responseCounts,
   STATUS_LABEL,
   statusCounts,
+  type AttentionFilter,
   type ChannelFilter,
   type LeadFilter,
+  type PipelineFilter,
+  type ResponseFilter,
   type StatusFilter,
 } from "../../lib/conversations";
 import { draftFollowUp, dueFollowUp, sortFollowUps, type FollowUp } from "../../lib/followUps";
 import { LEAD_EMOJI } from "../../lib/leadScoring";
+import { dateTime, money } from "../../lib/format";
 import {
   addSampleConversations,
+  addInternalNote,
+  assignConversation,
   sendFollowUp,
   sendStaffReply,
   setClosed,
@@ -57,8 +68,11 @@ import {
   LeadBadge,
   LeadReasons,
   MessageBubble,
+  NextActionBadge,
+  PipelineBadge,
   SelectedHotelBadge,
   StatusBadge,
+  AssignedStaffBadge,
 } from "./parts";
 
 export default function Inbox() {
@@ -70,10 +84,14 @@ export default function Inbox() {
   const [channel, setChannel] = useState<ChannelFilter>("all");
   const [lead, setLead] = useState<LeadFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [attention, setAttention] = useState<AttentionFilter>("all");
+  const [response, setResponse] = useState<ResponseFilter>("all");
+  const [pipeline, setPipeline] = useState<PipelineFilter>("all");
   const [search, setSearch] = useState("");
   const [onlyFollowUps, setOnlyFollowUps] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addingSamples, setAddingSamples] = useState(false);
+  const [channelConfig, setChannelConfig] = useState<Record<string, boolean>>({});
 
   // Keep row times honest without a refresh.
   const [now, setNow] = useState(() => new Date());
@@ -85,6 +103,9 @@ export default function Inbox() {
   const counts = useMemo(() => channelCounts(conversations), [conversations]);
   const leads = useMemo(() => leadCounts(conversations), [conversations]);
   const statuses = useMemo(() => statusCounts(conversations), [conversations]);
+  const attentions = useMemo(() => attentionCounts(conversations), [conversations]);
+  const responses = useMemo(() => responseCounts(conversations), [conversations]);
+  const pipelines = useMemo(() => pipelineCounts(conversations), [conversations]);
   // Who the hotel still owes something, worked out from the thread itself
   // (D21). It moves with the clock, so it follows the minute tick above.
   const followUps = useMemo(() => {
@@ -95,11 +116,42 @@ export default function Inbox() {
     }
     return due;
   }, [conversations, now]);
+
+  // Which channels this hotel has configured (WhatsApp, Instagram, Email).
+  // Web is always available. Unconfigured channels are shown as "setup required".
+  useEffect(() => {
+    if (!hotelId) return;
+    let cancelled = false;
+    fetch("/api/ai/channels")
+      .then((response) => {
+        if (!response.ok) return null;
+        return response.json();
+      })
+      .then((data) => {
+        if (cancelled || !data) return;
+        const config: Record<string, boolean> = {};
+        for (const ch of data.channels) config[ch.id] = ch.configured;
+        setChannelConfig(config);
+      })
+      .catch((err) => console.error("Failed to load channel config:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [hotelId]);
+
   const visible = useMemo(() => {
-    const matching = filterConversations(conversations, { channel, lead, status, query: search });
+    const matching = filterConversations(conversations, {
+      channel,
+      lead,
+      status,
+      attention,
+      response,
+      pipeline,
+      query: search,
+    });
     // Working down the follow-up list means hottest first, longest wait first.
     return onlyFollowUps ? sortFollowUps(matching.filter((c) => followUps.has(c.id)), now) : matching;
-  }, [conversations, channel, lead, status, search, onlyFollowUps, followUps, now]);
+  }, [conversations, channel, lead, status, attention, response, pipeline, search, onlyFollowUps, followUps, now]);
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
   const hasSamples = conversations.some((c) => c.mock);
 
@@ -127,6 +179,29 @@ export default function Inbox() {
     { key: "all" as LeadFilter, label: `All ${leads.all}` },
     ...LEAD_SCORES.map((score) => ({ key: score as LeadFilter, label: `${LEAD_EMOJI[score]} ${LEAD_LABEL[score]} ${leads[score]}` })),
   ];
+
+  const attentionOptions = [
+    { key: "all" as AttentionFilter, label: `All ${attentions.all}` },
+    { key: "needsAttention" as AttentionFilter, label: `Needs attention ${attentions.needsAttention}` },
+    { key: "lost" as AttentionFilter, label: `Lost ${attentions.lost}` },
+  ];
+
+  const responseOptions = [
+    { key: "all" as ResponseFilter, label: `All ${responses.all}` },
+    {
+      key: "awaitingHotel" as ResponseFilter,
+      label: `Awaiting hotel ${responses.awaitingHotel}`,
+    },
+    {
+      key: "awaitingGuest" as ResponseFilter,
+      label: `Awaiting guest ${responses.awaitingGuest}`,
+    },
+  ];
+
+  const pipelineOptions = PIPELINE_STAGES.map((key) => ({
+    key: key as PipelineFilter,
+    label: `${PIPELINE_STAGE_LABEL[key]} ${pipelines[key]}`,
+  }));
 
   return (
     <div className="space-y-5">
@@ -176,6 +251,9 @@ export default function Inbox() {
               <SegmentedControl label="Filter by status" value={status} options={statusOptions} onChange={setStatus} />
               <SegmentedControl label="Filter by channel" value={channel} options={filterOptions} onChange={setChannel} />
               <SegmentedControl label="Filter by lead score" value={lead} options={leadOptions} onChange={setLead} />
+              <SegmentedControl label="Filter by attention" value={attention} options={attentionOptions} onChange={setAttention} />
+              <SegmentedControl label="Filter by response awaited" value={response} options={responseOptions} onChange={setResponse} />
+              <SegmentedControl label="Filter by pipeline stage" value={pipeline} options={pipelineOptions} onChange={setPipeline} />
               <button
                 type="button"
                 aria-pressed={onlyFollowUps}
@@ -217,6 +295,7 @@ export default function Inbox() {
                     onSelect={() => setSelectedId(conversation.id)}
                     now={now}
                     hotelName={profile.name}
+                    channelConfig={channelConfig}
                   />
                 ))
               )}
@@ -233,6 +312,7 @@ export default function Inbox() {
                 hotelName={profile.name}
                 followUp={followUps.get(selected.id) ?? null}
                 onBack={() => setSelectedId(null)}
+                channelConfig={channelConfig}
               />
             ) : (
               <div className="flex-1 flex items-center justify-center p-8">
@@ -252,17 +332,22 @@ function Thread({
   hotelName,
   followUp,
   onBack,
+  channelConfig,
 }: {
   hotelId: string;
   conversation: ReturnType<typeof useConversations>["conversations"][number];
   hotelName: string;
   followUp: FollowUp | null;
   onBack: () => void;
+  channelConfig?: Record<string, boolean>;
 }) {
   const toast = useToast();
   const { messages, loading } = useMessages(hotelId, conversation.id);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [assignedStaffId, setAssignedStaffId] = useState(conversation.assignedStaffId);
+  const [assignedStaffName, setAssignedStaffName] = useState(conversation.assignedStaffName);
+  const [noteDraft, setNoteDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -275,6 +360,17 @@ function Thread({
     setBusy(false);
     if (result.ok) toast.success(handledBy === "human" ? "You're handling this conversation" : "The AI concierge is back on this conversation");
     else toast.error(result.error);
+  };
+
+  const assignStaff = async () => {
+    setBusy(true);
+    const result = await assignConversation(hotelId, conversation, assignedStaffId, assignedStaffName);
+    setBusy(false);
+    if (result.ok) {
+      toast.success(assignedStaffId ? `Assigned to ${assignedStaffName}` : "Unassigned");
+    } else {
+      toast.error(result.error);
+    }
   };
 
   const reply = async (event: FormEvent) => {
@@ -290,6 +386,20 @@ function Thread({
     setBusy(false);
     if (!result.ok) {
       setDraft(text);
+      toast.error(result.error);
+    }
+  };
+
+  const addNote = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy || !noteDraft.trim()) return;
+    const text = noteDraft;
+    setNoteDraft("");
+    setBusy(true);
+    const result = await addInternalNote(hotelId, conversation, assignedStaffName || "Staff", text);
+    setBusy(false);
+    if (!result.ok) {
+      setNoteDraft(text);
       toast.error(result.error);
     }
   };
@@ -319,6 +429,31 @@ function Thread({
             {conversation.guestContact || "No contact details yet"}
             {conversation.reservationId && ` · ${conversation.reservationId}`}
           </p>
+          {conversation.inquiry.checkIn || conversation.inquiry.guestCount || conversation.inquiry.roomType && (
+            <p className="text-xs muted truncate">
+              {conversation.inquiry.checkIn && conversation.inquiry.checkOut && (
+                <>
+                  {conversation.inquiry.checkIn} → {conversation.inquiry.checkOut}
+                  {conversation.inquiry.guestCount && ` · ${conversation.inquiry.guestCount} guest${conversation.inquiry.guestCount === 1 ? "" : "s"}`}
+                </>
+              )}
+              {conversation.inquiry.checkIn && !conversation.inquiry.checkOut && conversation.inquiry.guestCount && (
+                <>
+                  {conversation.inquiry.checkIn} · {conversation.inquiry.guestCount} guest{conversation.inquiry.guestCount === 1 ? "" : "s"}
+                </>
+              )}
+              {!conversation.inquiry.checkIn && conversation.inquiry.guestCount && (
+                `${conversation.inquiry.guestCount} guest${conversation.inquiry.guestCount === 1 ? "" : "s"}`
+              )}
+              {conversation.inquiry.roomType && <>{` · ${conversation.inquiry.roomType}`}</>}
+              {conversation.inquiry.budget !== undefined && conversation.inquiry.budget !== null && (
+                <>
+                  {" · "}
+                  <span className="font-semibold">{money(conversation.inquiry.budget, "UGX")}</span>
+                </>
+              )}
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -338,14 +473,42 @@ function Thread({
             <Headset size={14} /> Take over
           </button>
         )}
+        <div className="flex items-center gap-2">
+          <span className="text-xs muted" style={{ color: "var(--text-secondary)" }}>Assign:</span>
+          <select
+            value={assignedStaffId}
+            onChange={(e) => {
+              setAssignedStaffId(e.target.value);
+              if (e.target.value === "me") setAssignedStaffName("Staff");
+              else setAssignedStaffName("");
+            }}
+            disabled={busy}
+            className="select select-sm"
+            aria-label="Assign conversation to staff"
+          >
+            <option value="">Unassigned</option>
+            <option value="me">Me</option>
+          </select>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={assignStaff}
+            disabled={busy}
+          >
+            Save
+          </button>
+        </div>
         <div className="w-full flex flex-wrap gap-1.5">
-          <ChannelBadge channel={conversation.channel} mock={conversation.mock} />
+          <ChannelBadge channel={conversation.channel} mock={conversation.mock} configured={channelConfig?.[conversation.channel]} />
           <HandlerBadge handledBy={conversation.handledBy} />
           <LeadBadge lead={conversation.lead} />
           <StatusBadge conversation={conversation} />
           <SelectedHotelBadge conversation={conversation} hotelName={hotelName} />
           <FollowUpBadge followUp={followUp} />
           <LeadReasons lead={conversation.lead} />
+          <PipelineBadge stage={conversation.pipelineStage} />
+          <NextActionBadge action={conversation.nextAction} />
+          <AssignedStaffBadge conversation={conversation} />
         </div>
       </header>
 
@@ -362,7 +525,31 @@ function Thread({
             <div className="skeleton ml-auto" style={{ height: 48, width: "50%" }} />
           </div>
         ) : (
-          messages.map((message) => <MessageBubble key={message.id} message={message} guestName={conversation.guestName} />)
+          <>
+            {messages
+              .filter((m) => m.role !== "internal_note")
+              .map((message) => (
+                <MessageBubble key={message.id} message={message} guestName={conversation.guestName} />
+              ))}
+            {messages
+              .filter((m) => m.role === "internal_note")
+              .map((note) => (
+                <div key={note.id} className="flex justify-start">
+                  <div className="max-w-[85%] sm:max-w-[70%]">
+                    <p className="text-[11px] mb-1 flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+                      <span>Internal note</span> · <span>{dateTime(note.at)}</span>
+                    </p>
+                    <div
+                      className="rounded-2xl rounded-tr-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words"
+                      style={{ background: "var(--surface-muted)", color: "var(--text-secondary)", border: "1px dashed var(--border)" }}
+                    >
+                      {note.text}
+                      {note.staffName && <span className="block text-[10px] mt-1 opacity-70">— {note.staffName}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </>
         )}
       </div>
 
@@ -378,29 +565,48 @@ function Thread({
 
       <div className="px-4 py-3" style={{ borderTop: "1px solid var(--border)" }}>
         {human ? (
-          <form onSubmit={reply} className="flex items-end gap-2">
-            <label htmlFor="staff-reply" className="sr-only">
-              Reply to {conversation.guestName}
-            </label>
-            <textarea
-              id="staff-reply"
-              className="input resize-none"
-              rows={2}
-              maxLength={MAX_MESSAGE_TEXT}
-              placeholder={`Reply to ${conversation.guestName}…`}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  e.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
-            <button type="submit" className="btn btn-primary shrink-0" disabled={busy || !draft.trim()}>
-              <Send size={15} /> Send
-            </button>
-          </form>
+          <>
+            <form onSubmit={reply} className="flex items-end gap-2 mb-3">
+              <label htmlFor="staff-reply" className="sr-only">
+                Reply to {conversation.guestName}
+              </label>
+              <textarea
+                id="staff-reply"
+                className="input resize-none"
+                rows={2}
+                maxLength={MAX_MESSAGE_TEXT}
+                placeholder={`Reply to ${conversation.guestName}…`}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+              />
+              <button type="submit" className="btn btn-primary shrink-0" disabled={busy || !draft.trim()}>
+                <Send size={15} /> Send
+              </button>
+            </form>
+            <form onSubmit={addNote} className="flex items-end gap-2">
+              <label htmlFor="internal-note" className="sr-only">
+                Internal note
+              </label>
+              <textarea
+                id="internal-note"
+                className="input resize-none"
+                rows={2}
+                maxLength={MAX_MESSAGE_TEXT}
+                placeholder="Internal note (staff only, guests cannot see)…"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+              />
+              <button type="submit" className="btn btn-secondary shrink-0" disabled={busy || !noteDraft.trim()}>
+                Add note
+              </button>
+            </form>
+          </>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
             <span className="flex items-center gap-2">

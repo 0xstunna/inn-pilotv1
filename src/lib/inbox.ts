@@ -135,6 +135,64 @@ export async function setClosed(hotelId: string, conversation: Conversation, clo
   return ok(null);
 }
 
+/** Assign this conversation to a staff member (or unassign when staffId is empty). */
+export async function assignConversation(
+  hotelId: string,
+  conversation: Conversation,
+  staffId: string,
+  staffName: string
+): Promise<ServiceResult<null>> {
+  try {
+    await updateDoc(doc(hotelCollection(hotelId, COLLECTIONS.CONVERSATIONS), conversation.id), {
+      assignedStaffId: staffId,
+      assignedStaffName: staffName,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("Failed to assign conversation:", err);
+    return fail("Couldn't assign this conversation. Please try again.");
+  }
+  logAction(
+    hotelId,
+    `Conversation assigned to ${staffName}`,
+    "conversation",
+    conversation.id,
+    conversation.guestName
+  );
+  return ok(null);
+}
+
+/** Write an internal staff note into the thread. Guests never see it: the guest
+ * polling endpoint only returns staff-role messages. */
+export async function addInternalNote(
+  hotelId: string,
+  conversation: Conversation,
+  staffName: string,
+  note: string
+): Promise<ServiceResult<null>> {
+  const body = note.trim();
+  if (!body) return fail("Write a note first.");
+  if (body.length > MAX_MESSAGE_TEXT) return fail(`Keep notes under ${MAX_MESSAGE_TEXT} characters.`);
+
+  const at = serverTimestamp();
+  const ref = doc(hotelCollection(hotelId, COLLECTIONS.CONVERSATIONS), conversation.id);
+  const batch = writeBatch(db);
+  batch.set(doc(collection(ref, "messages")), { role: "internal_note", text: body, at, hotelId, staffName });
+  batch.update(ref, {
+    lastMessage: { role: "internal_note", text: body, at },
+    messageCount: increment(1),
+    updatedAt: at,
+  });
+  try {
+    await batch.commit();
+  } catch (err) {
+    console.error("Failed to add internal note:", err);
+    return fail("Couldn't add the note. Please try again.");
+  }
+  logAction(hotelId, "Internal note added", "conversation", conversation.id, conversation.guestName);
+  return ok(null);
+}
+
 /**
  * Writes a message from the hotel into a thread. One path for both a reply
  * and a follow-up, so they agree on the clock and on the summary.

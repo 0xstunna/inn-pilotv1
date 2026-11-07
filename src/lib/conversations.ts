@@ -37,11 +37,62 @@ export type ConversationBookingState = (typeof CONVERSATION_BOOKING_STATES)[numb
 export const HOTEL_SELECTIONS = ["none", "this", "other"] as const;
 export type HotelSelection = (typeof HOTEL_SELECTIONS)[number];
 
-export const MESSAGE_ROLES = ["guest", "ai", "staff"] as const;
+export const MESSAGE_ROLES = ["guest", "ai", "staff", "internal_note"] as const;
 export type MessageRole = (typeof MESSAGE_ROLES)[number];
 
 export const LEAD_SCORES = ["hot", "warm", "cold", "vip"] as const;
 export type LeadScore = (typeof LEAD_SCORES)[number];
+
+/** The seven stages of the lead pipeline, from first contact to outcome. */
+export const PIPELINE_STAGES = [
+  "new",
+  "qualified",
+  "quoted",
+  "interested",
+  "followUp",
+  "booked",
+  "lost",
+] as const;
+export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+
+/** The next action a staff member should take on a conversation, or null when none is needed. */
+export const NEXT_ACTIONS = [
+  "respond",
+  "quote",
+  "alternative",
+  "followUp",
+  "escalate",
+] as const;
+export type NextAction = (typeof NEXT_ACTIONS)[number];
+
+/** What each pipeline stage means, for the inbox column header and tooltips. */
+export const PIPELINE_STAGE_LABEL: Record<PipelineStage, string> = {
+  new: "New inquiry",
+  qualified: "Qualified",
+  quoted: "Quoted",
+  interested: "Interested",
+  followUp: "Follow-up required",
+  booked: "Booked",
+  lost: "Lost",
+};
+
+/** What each next action means, for the inbox badge and staff guidance. */
+export const NEXT_ACTION_LABEL: Record<NextAction, string> = {
+  respond: "Respond immediately",
+  quote: "Send a room quotation",
+  alternative: "Suggest an alternative room",
+  followUp: "Follow up with the guest",
+  escalate: "Escalate to hotel staff",
+};
+
+/** What each next action's urgency colour tone is. */
+export const NEXT_ACTION_TONE: Record<NextAction, string> = {
+  respond: "badge-danger",
+  quote: "badge-info",
+  alternative: "badge-warning",
+  followUp: "badge-warning",
+  escalate: "badge-danger",
+};
 
 /** How close this guest is to booking, and why (see src/lib/leadScoring.ts). */
 export interface LeadAssessment {
@@ -51,6 +102,20 @@ export interface LeadAssessment {
 
 export const MAX_MESSAGE_TEXT = 4_000;
 export const SNIPPET_LENGTH = 90;
+
+/** The guest's inquiry details, gathered across the conversation. */
+export interface ConversationInquiry {
+  /** Requested check-in date, YYYY-MM-DD. */
+  checkIn?: string;
+  /** Requested check-out date, YYYY-MM-DD. */
+  checkOut?: string;
+  /** Number of guests, when provided. */
+  guestCount?: number;
+  /** Preferred room type, when provided. */
+  roomType?: string;
+  /** Budget or price expectation, when provided. */
+  budget?: number;
+}
 
 /** Web guests are anonymous until they book under a name. */
 export const WEB_GUEST_NAME = "Web visitor";
@@ -86,6 +151,12 @@ export interface Conversation {
   followUpSnoozedUntil: Date | null;
   messageCount: number;
   mock: boolean;
+  /** The guest's inquiry details, gathered across the conversation. */
+  inquiry: ConversationInquiry;
+  /** Which stage of the lead pipeline this conversation is at. */
+  pipelineStage: PipelineStage;
+  /** The next recommended action for staff, or null when none is needed. */
+  nextAction: NextAction | null;
   /** Network concierge (D29): has the guest chosen this hotel, another, or none yet. */
   selection: HotelSelection;
   /** The hotel the guest chose, when they chose one. */
@@ -94,6 +165,10 @@ export interface Conversation {
   bookedElsewhere: boolean;
   /** Staff marked the conversation closed. */
   closed: boolean;
+  /** Staff member this conversation is assigned to, when assigned. */
+  assignedStaffId: string;
+  /** Name of the assigned staff member. */
+  assignedStaffName: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -103,6 +178,8 @@ export interface ConversationMessage {
   role: MessageRole;
   text: string;
   at: Date | null;
+  /** Only on staff-role and internal_note messages: who wrote it. */
+  staffName?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -133,6 +210,27 @@ function toLead(value: unknown): LeadAssessment | null {
   };
 }
 
+/** Parses a next action, tolerating missing or null values. */
+function toNextAction(value: unknown): NextAction | null {
+  if (typeof value === "string" && (NEXT_ACTIONS as readonly unknown[]).includes(value)) {
+    return value as NextAction;
+  }
+  return null;
+}
+
+/** Parses the stored inquiry details, tolerating missing or malformed fields. */
+function toInquiry(value: unknown): ConversationInquiry {
+  if (!value || typeof value !== "object") return {};
+  const data = value as Record<string, unknown>;
+  const inquiry: ConversationInquiry = {};
+  if (typeof data.checkIn === "string" && data.checkIn.trim()) inquiry.checkIn = data.checkIn.trim();
+  if (typeof data.checkOut === "string" && data.checkOut.trim()) inquiry.checkOut = data.checkOut.trim();
+  if (typeof data.guestCount === "number" && Number.isFinite(data.guestCount)) inquiry.guestCount = data.guestCount;
+  if (typeof data.roomType === "string" && data.roomType.trim()) inquiry.roomType = data.roomType.trim();
+  if (typeof data.budget === "number" && Number.isFinite(data.budget)) inquiry.budget = data.budget;
+  return inquiry;
+}
+
 export function toConversation(id: string, data: Record<string, unknown>): Conversation {
   const last = data.lastMessage as Record<string, unknown> | undefined;
   return {
@@ -154,6 +252,11 @@ export function toConversation(id: string, data: Record<string, unknown>): Conve
     followUpSnoozedUntil: toDate(data.followUpSnoozedUntil),
     messageCount: typeof data.messageCount === "number" ? data.messageCount : 0,
     mock: data.mock === true,
+    inquiry: toInquiry(data.inquiry),
+    pipelineStage: oneOf(PIPELINE_STAGES, data.pipelineStage, "new"),
+    nextAction: toNextAction(data.nextAction),
+    assignedStaffId: typeof data.assignedStaffId === "string" ? data.assignedStaffId : "",
+    assignedStaffName: typeof data.assignedStaffName === "string" ? data.assignedStaffName : "",
     selection: oneOf(HOTEL_SELECTIONS, data.selection, "none"),
     selectedHotelName: typeof data.selectedHotelName === "string" ? data.selectedHotelName : "",
     bookedElsewhere: data.bookedElsewhere === true,
@@ -169,6 +272,7 @@ export function toMessage(id: string, data: Record<string, unknown>): Conversati
     role: oneOf(MESSAGE_ROLES, data.role, "guest"),
     text: typeof data.text === "string" ? data.text : "",
     at: toDate(data.at),
+    staffName: typeof data.staffName === "string" ? data.staffName : undefined,
   };
 }
 
@@ -236,6 +340,74 @@ export function conversationStatus(c: Pick<Conversation, "bookingStatus" | "clos
   return "new";
 }
 
+/**
+ * Which stage of the lead pipeline this conversation is at. Computed
+ * deterministically from the conversation's stored state — no model call,
+ * no guesswork.
+ *
+ *   booked   → a reservation was confirmed;
+ *   lost     → closed without booking, or the guest booked elsewhere;
+ *   followUp → quoted but the guest has gone quiet or is waiting;
+ *   interested → quoted, contact details given, ready to book;
+ *   quoted   → availability and prices were shown;
+ *   qualified → dates were given but nothing quoted yet;
+ *   new      → nothing yet.
+ */
+export function pipelineStage(c: Pick<
+  Conversation,
+  "bookingStatus" | "closed" | "bookedElsewhere" | "inquiry" | "lead" | "leadSignals"
+>): PipelineStage {
+  if (c.bookingStatus === "booked") return "booked";
+  if (c.closed || c.bookedElsewhere) return "lost";
+  if (c.bookingStatus === "quoted") {
+    if (c.leadSignals.gaveContact) return "interested";
+    return "quoted";
+  }
+  if (c.inquiry.checkIn || c.inquiry.checkOut) return "qualified";
+  return "new";
+}
+
+/**
+ * The next recommended action for staff, computed from the pipeline stage,
+ * follow-up state and lead score. Null when no action is needed (booked or
+ * lost).
+ *
+ *   respond     → guest is waiting for a reply (waiting follow-up);
+ *   quote       → dates given but nothing quoted yet (qualified stage);
+ *   alternative → price changed or room unavailable (quoted, no availability);
+ *   followUp    → interested guest went quiet (quiet follow-up);
+ *   escalate    → VIP or high-intent lead a person should close personally;
+ *   null        → booked or lost, nothing to do.
+ */
+export function nextAction(c: Pick<
+  Conversation,
+  "pipelineStage" | "lead" | "leadSignals" | "lastMessage" | "followUpSentAt" | "lastGuestAt"
+>, now: Date = new Date()): NextAction | null {
+  if (c.pipelineStage === "booked" || c.pipelineStage === "lost") return null;
+
+  const score = c.lead?.score ?? "cold";
+  const last = c.lastMessage;
+
+  // A guest waiting for a reply is the most urgent action.
+  if (last && last.role === "guest") {
+    const hoursSince = (date: Date) => (now.getTime() - date.getTime()) / 3_600_000;
+    const waitHours = hoursSince(c.lastGuestAt ?? last.at);
+    const waitThreshold = score === "vip" ? 1 : score === "hot" ? 1 : score === "warm" ? 2 : 6;
+    if (waitHours >= waitThreshold) return "respond";
+  }
+
+  // VIP or high-intent leads should be handled by a person.
+  if (score === "vip" || (score === "hot" && c.pipelineStage === "interested")) return "escalate";
+
+  switch (c.pipelineStage) {
+    case "qualified": return "quote";
+    case "quoted": return "followUp";
+    case "interested": return "followUp";
+    case "new": return "respond";
+    default: return null;
+  }
+}
+
 export const STATUS_LABEL: Record<ConversationStatus, string> = {
   new: "New",
   active: "Active",
@@ -260,6 +432,45 @@ export function statusCounts(list: Conversation[]): Record<StatusFilter, number>
 
 export type ChannelFilter = Channel | "all";
 export type LeadFilter = LeadScore | "all";
+export type PipelineFilter = PipelineStage | "all";
+
+/** Conversations that need staff attention: not closed, not booked elsewhere, not handled by a human. */
+export type AttentionFilter = "all" | "needsAttention" | "lost";
+export type ResponseFilter = "all" | "awaitingHotel" | "awaitingGuest";
+
+function needsAttention(c: Conversation): boolean {
+  return !c.closed && !c.bookedElsewhere && c.handledBy !== "human";
+}
+
+function isLost(c: Conversation): boolean {
+  return c.closed && c.bookingStatus !== "booked";
+}
+
+function awaitingHotelResponse(c: Conversation): boolean {
+  return !c.closed && c.bookingStatus !== "booked" && c.lastMessage?.role === "guest";
+}
+
+function awaitingGuestResponse(c: Conversation): boolean {
+  return !c.closed && c.bookingStatus !== "booked" && c.lastMessage?.role !== "guest";
+}
+
+export function attentionCounts(list: Conversation[]): Record<AttentionFilter, number> {
+  const counts = { all: list.length, needsAttention: 0, lost: 0 };
+  for (const c of list) {
+    if (needsAttention(c)) counts.needsAttention++;
+    if (isLost(c)) counts.lost++;
+  }
+  return counts;
+}
+
+export function responseCounts(list: Conversation[]): Record<ResponseFilter, number> {
+  const counts = { all: list.length, awaitingHotel: 0, awaitingGuest: 0 };
+  for (const c of list) {
+    if (awaitingHotelResponse(c)) counts.awaitingHotel++;
+    if (awaitingGuestResponse(c)) counts.awaitingGuest++;
+  }
+  return counts;
+}
 
 /** Newest activity first; a conversation with no activity yet sorts last. */
 export function sortConversations(list: Conversation[]): Conversation[] {
@@ -273,8 +484,19 @@ export function filterConversations(
     channel = "all",
     lead = "all",
     status = "all",
+    attention = "all",
+    response = "all",
+    pipeline = "all",
     query = "",
-  }: { channel?: ChannelFilter; lead?: LeadFilter; status?: StatusFilter; query?: string }
+  }: {
+    channel?: ChannelFilter;
+    lead?: LeadFilter;
+    status?: StatusFilter;
+    attention?: AttentionFilter;
+    response?: ResponseFilter;
+    pipeline?: PipelineFilter;
+    query?: string;
+  }
 ): Conversation[] {
   const q = query.trim().toLowerCase();
   return list.filter(
@@ -282,6 +504,9 @@ export function filterConversations(
       (channel === "all" || c.channel === channel) &&
       (lead === "all" || c.lead?.score === lead) &&
       (status === "all" || conversationStatus(c) === status) &&
+      (attention === "all" || (attention === "needsAttention" ? needsAttention(c) : isLost(c))) &&
+      (response === "all" || (response === "awaitingHotel" ? awaitingHotelResponse(c) : awaitingGuestResponse(c))) &&
+      (pipeline === "all" || c.pipelineStage === pipeline) &&
       (!q ||
         c.guestName.toLowerCase().includes(q) ||
         c.guestContact.toLowerCase().includes(q) ||
@@ -301,6 +526,13 @@ export function channelCounts(list: Conversation[]): Record<ChannelFilter, numbe
 export function leadCounts(list: Conversation[]): Record<LeadFilter, number> {
   const counts = { all: list.length, hot: 0, warm: 0, cold: 0, vip: 0 };
   for (const c of list) if (c.lead) counts[c.lead.score]++;
+  return counts;
+}
+
+/** Conversations by pipeline stage. */
+export function pipelineCounts(list: Conversation[]): Record<PipelineStage, number> {
+  const counts: Record<PipelineStage, number> = { new: 0, qualified: 0, quoted: 0, interested: 0, followUp: 0, booked: 0, lost: 0 };
+  for (const c of list) counts[c.pipelineStage]++;
   return counts;
 }
 

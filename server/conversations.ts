@@ -15,10 +15,14 @@ import {
   advanceBookingState,
   isConversationId,
   MAX_MESSAGE_TEXT,
+  nextAction,
+  pipelineStage,
   toConversation,
   toMessage,
   WEB_GUEST_NAME,
+  type Channel,
   type ConversationBookingState,
+  type ConversationInquiry,
   type HotelSelection,
   type ConversationMessage,
   type Handler,
@@ -128,6 +132,15 @@ export interface TurnRecord {
     guests?: number;
     roomType?: string;
   };
+  /** The guest's inquiry details, when this turn provides or updates them. */
+  inquiry?: ConversationInquiry;
+  /** The source channel's own message id, for duplicate-webhook prevention (e.g. WhatsApp message id). */
+  externalMessageId?: string;
+  /** The channel this conversation belongs to. Defaults to "web" on creation. */
+  channel?: Channel;
+  /** Assign this conversation to a staff member. */
+  assignedStaffId?: string;
+  assignedStaffName?: string;
 }
 
 /** What a browser may send as a turn id. */
@@ -158,9 +171,11 @@ export async function recordTurn(scope: HotelScope, conversation: OpenConversati
 
     // The retry of a message already recorded when its turn failed.
     const repeat = isTurnId(turn.turnId) && data?.pendingTurnId === turn.turnId;
+    // Duplicate webhook prevention: the same channel message id already recorded.
+    const externalRepeat = Boolean(turn.externalMessageId) && data?.externalMessageId === turn.externalMessageId;
     const backfill = current ? [] : (turn.backfill ?? []).filter((entry) => entry.text.trim());
     const entries: { role: MessageRole; text: string; at: Date }[] = [...backfill];
-    if (!repeat) entries.push({ role: "guest", text: turn.guestText, at: new Date(receivedAt) });
+    if (!repeat && !externalRepeat) entries.push({ role: "guest", text: turn.guestText, at: new Date(receivedAt) });
     if (turn.replyText) {
       entries.push({ role: turn.replyRole ?? "ai", text: turn.replyText, at: new Date(Math.max(now, receivedAt + 1)) });
     }
@@ -184,7 +199,7 @@ export async function recordTurn(scope: HotelScope, conversation: OpenConversati
     // What this guest has shown, this turn on top of every turn before it.
     let signals = toLeadSignals(data?.leadSignals);
     for (const entry of backfill) if (entry.role === "guest") signals = mergeSignals(signals, detectSignals(entry.text));
-    if (!repeat) signals = mergeSignals(signals, detectSignals(turn.guestText));
+    if (!repeat && !externalRepeat) signals = mergeSignals(signals, detectSignals(turn.guestText));
     if (turn.quoted) signals = mergeSignals(signals, { sawAvailability: true });
     if (turn.booking) signals = mergeSignals(signals, bookingSignals(turn.booking));
     const lead = scoreLead({ bookingStatus, signals });
@@ -214,15 +229,59 @@ export async function recordTurn(scope: HotelScope, conversation: OpenConversati
             guestContact: turn.booking.guestPhone,
           }
         : {}),
+      ...(turn.inquiry
+        ? {
+            inquiry: {
+              ...(current?.inquiry as ConversationInquiry | undefined),
+              ...turn.inquiry,
+            },
+          }
+        : {}),
+      ...(turn.externalMessageId ? { externalMessageId: turn.externalMessageId } : {}),
+      ...(turn.assignedStaffId !== undefined ? { assignedStaffId: turn.assignedStaffId } : {}),
+      ...(turn.assignedStaffName !== undefined ? { assignedStaffName: turn.assignedStaffName } : {}),
     };
+
+    // Compute the pipeline stage and next recommended action from the new state.
+    const newInquiry = turn.inquiry
+      ? { ...(current?.inquiry as ConversationInquiry | undefined), ...turn.inquiry }
+      : (current?.inquiry as ConversationInquiry | undefined) ?? {};
+    const newClosed = data?.closed ?? false;
+    const newBookedElsewhere = turn.bookedElsewhere !== undefined ? turn.bookedElsewhere : (data?.bookedElsewhere ?? false);
+    const newLastGuestAt = (guestAt && (!current?.lastGuestAt || guestAt.getTime() >= current.lastGuestAt.getTime()))
+      ? guestAt
+      : (current?.lastGuestAt ?? null);
+    const newLastMessage = newest
+      ? { role: last.role, text: last.text.slice(0, MAX_MESSAGE_TEXT), at: last.at }
+      : (current?.lastMessage ?? null);
+
+    const stage = pipelineStage({
+      bookingStatus,
+      closed: newClosed,
+      bookedElsewhere: newBookedElsewhere,
+      inquiry: newInquiry,
+      lead,
+      leadSignals: signals,
+    });
+    const action = nextAction({
+      pipelineStage: stage,
+      lead,
+      leadSignals: signals,
+      lastMessage: newLastMessage,
+      followUpSentAt: current?.followUpSentAt ?? null,
+      lastGuestAt: newLastGuestAt,
+    }, new Date(now));
+
+    summary.pipelineStage = stage;
+    summary.nextAction = action;
 
     if (current) {
       tx.update(conversation.ref, summary);
     } else {
       tx.create(conversation.ref, {
-        channel: "web",
-        guestName: WEB_GUEST_NAME,
-        guestContact: "",
+        channel: turn.channel ?? "web",
+        guestName: turn.guest?.name || WEB_GUEST_NAME,
+        guestContact: turn.guest?.phone ?? "",
         selection: "none",
         selectedHotelName: "",
         bookedElsewhere: false,

@@ -139,7 +139,7 @@ const valueProps: { icon: React.ReactNode; title: string; description: string }[
    ------------------------------------------------------------ */
 const faqs: { q: string; a: string }[] = [
   { q: "Do I need to create an account?", a: "No. Click Get Started, tell us about your hotel and your workspace is ready straight away. There is no sign-up and no password." },
-  { q: "What do I get when I create a workspace?", a: "A dashboard for your hotel with a starting room inventory and nightly rates in your currency, so you can take a reservation immediately. Add rooms any time from Accommodation." },
+  { q: "What do I get when I create a workspace?", a: "A dashboard for your hotel with a starting room inventory and nightly rates in your currency, so you can take a reservation immediately. Add rooms any time from Rooms." },
   { q: "How long does setup take?", a: "Under a minute. Name your hotel, add your contact details and how many rooms you have, and InnPilot builds your workspace." },
   { q: "Do you publish pricing?", a: "Every workspace starts on a free trial. Pricing is straightforward and scales with your property — no enterprise contracts or per-module upsells." },
   { q: "Does InnPilot work if my internet connection is unreliable?", a: "InnPilot is a cloud-based platform designed to stay fast and responsive on the connectivity typical of independent hotels." },
@@ -334,9 +334,9 @@ const LandingPage = () => {
               <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
                 <BedDouble size={20} />
               </div>
-              <h3 className="font-semibold text-slate-800 mb-2">Booking confirmed in Accommodation</h3>
+              <h3 className="font-semibold text-slate-800 mb-2">Booking confirmed in Rooms</h3>
               <p className="text-sm text-slate-500 leading-relaxed mb-4">
-                Confirmed bookings appear in Accommodation with the guest details, dates and room type.
+                Confirmed bookings appear in Rooms with the guest details, dates and room type.
                 Guests pay at the hotel on arrival — no fake deposit buttons.
               </p>
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--brand-cyan)]">

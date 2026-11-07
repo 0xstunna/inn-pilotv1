@@ -81,10 +81,10 @@ const AI_POLL_MS = 15_000;
 const POLL_OVERLAP_MS = 30_000;
 
 const NETWORK_SUGGESTIONS = [
-  "Find me a room tonight",
-  "Double room in Western Uganda this weekend",
+  "I need a double room tonight",
+  "Double room this weekend",
   "Family room from 10–15 October",
-  "Find the cheapest available room in Kabale",
+  "Do you have any rooms free in Kabale?",
 ];
 
 const hotelSuggestions = (name: string) => [
@@ -352,7 +352,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
     disabled: pending,
     onSend: (text) => void send(text),
     onEdit: () => {
-      setDraft("I'd like to change ");
+      setDraft("I'd like to change my booking details. ");
       requestAnimationFrame(() => inputRef.current?.focus());
     },
   };
@@ -616,14 +616,14 @@ function Home({
                 </>
               ) : (
                 <>
-                  Find your stay <span style={{ color: "var(--brand-cyan)" }}>with AI</span>
+                  Find a room <span style={{ color: "var(--brand-cyan)" }}>at a hotel</span>
                 </>
               )}
             </h1>
             <p className="mt-4 text-base sm:text-lg max-w-2xl" style={{ color: "var(--rail-text)" }}>
               {hotel
                 ? "Tell me when you'd like to stay. I'll check live availability, show you real prices and book your room in this chat."
-                : "Search available hotels with a simple conversation. Say where and when — I'll find real rooms at real prices and book the one you choose."}
+                : "Tell me where and when you'd like to stay. I'll check live availability at participating hotels and help you book the right room."}
             </p>
           </motion.div>
 
@@ -707,7 +707,7 @@ function Properties({ disabled, onSend }: { disabled: boolean; onSend: (text: st
         <div>
           <p className="eyebrow">Participating properties</p>
           <h2 id="properties-title" className="font-poppins text-2xl font-semibold mt-1" style={{ color: "var(--text)" }}>
-            One conversation, every property
+            Where would you like to stay?
           </h2>
         </div>
         {hotels && <p className="text-sm muted">{hotels.length} hotels searched live</p>}

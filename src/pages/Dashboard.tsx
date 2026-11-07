@@ -26,7 +26,7 @@ const actions = [
   },
   {
     title: "Guest inquiries",
-    description: "Follow up on conversations and help guests finish their accommodation bookings.",
+    description: "Follow up on conversations and help guests finish their room bookings.",
     to: "/dashboard/inbox",
     action: "Open inbox",
     icon: MessagesSquare,
@@ -173,7 +173,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={profile.name ? `Welcome to ${profile.name}` : "InnPilot workspace"}
-        subtitle="Your accommodation booking workspace — rooms, guest inquiries and reservations in one place."
+        subtitle="Your hotel workspace — rooms, guest inquiries and reservations in one place."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -241,7 +241,7 @@ export default function Dashboard() {
               Verify each room's real name or number, type, guest capacity, nightly rate and status. Starter room entries or sample prices should not be treated as verified inventory.
             </p>
             <Link to="/dashboard/accommodation" className="inline-flex items-center gap-2 text-sm font-semibold mt-3" style={{ color: "var(--primary)" }}>
-              Review accommodation <ArrowRight size={15} />
+              Review rooms <ArrowRight size={15} />
             </Link>
           </div>
         </div>

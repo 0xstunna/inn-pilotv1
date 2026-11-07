@@ -21,7 +21,7 @@
  * then updated on every turn.
  */
 import type { DocumentReference } from "firebase-admin/firestore";
-import { toDate, toMessage, type ConversationMessage, type Handler, type MessageRole } from "../src/lib/conversations.js";
+import { toDate, toMessage, type ConversationInquiry, type ConversationMessage, type Handler, type MessageRole } from "../src/lib/conversations.js";
 import { MAX_MESSAGE_TEXT } from "../src/lib/conversations.js";
 import { adminDb } from "./admin.js";
 import type { PendingBooking } from "./ai/types.js";
@@ -258,6 +258,17 @@ export async function recordGuestTurn(thread: GuestThread, turn: GuestTurn): Pro
                   nights: booking.nights,
                   guests: booking.guests,
                   roomType: booking.roomType,
+                },
+              }
+            : {}),
+          ...(turn.pendingBooking
+            ? {
+                inquiry: {
+                  checkIn: turn.pendingBooking.checkIn,
+                  checkOut: turn.pendingBooking.checkOut,
+                  guestCount: turn.pendingBooking.numberOfGuests,
+                  roomType: turn.pendingBooking.roomType,
+                  budget: turn.pendingBooking.totalPrice,
                 },
               }
             : {}),

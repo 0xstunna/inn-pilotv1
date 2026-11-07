@@ -502,7 +502,7 @@ function BusinessStep({ form, errors, update }: StepProps) {
           id="roomCount"
           label="Starting room inventory size"
           error={errors.roomCount}
-          hint="This creates a starter inventory. After setup, open Accommodation to review each room name or number, assign its room type and set the correct nightly rate before accepting bookings."
+          hint="This creates a starter inventory. After setup, open Rooms to review each room name or number, assign its room type and set the correct nightly rate before accepting bookings."
         >
           <div className="flex items-center gap-2">
             <button
@@ -635,7 +635,7 @@ function ReviewStep({
           ))}
         </ul>
         <p className="text-xs muted mt-2">
-          These are starter entries, not verified hotel inventory or guaranteed prices. Review room identifiers, types and nightly rates in Accommodation before publishing your concierge link.
+          These are starter entries, not verified hotel inventory or guaranteed prices. Review room identifiers, types and nightly rates in Rooms before publishing your concierge link.
         </p>
       </div>
     </>

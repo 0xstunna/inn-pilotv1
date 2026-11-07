@@ -464,8 +464,16 @@ export function BookingSummaryCard({ quote, actions }: { quote: ConciergeQuote; 
       </div>
       <div className="px-4 py-2">
         <StayRows item={quote} />
+        <div className="kv kv-total-breakdown mt-2">
+          <span className="kv-label">Price breakdown</span>
+          <span className="kv-value text-right">
+            {money(quote.nightlyRate, quote.currency)} × {plural(quote.nights, "night")} = {money(quote.totalPrice, quote.currency)}
+          </span>
+        </div>
         <p className="text-xs muted mt-1 mb-2">
-          {money(quote.nightlyRate, quote.currency)} × {plural(quote.nights, "night")} · Phone {quote.guestPhone}
+          {quote.guestPhone && `Phone ${quote.guestPhone}`}
+          {quote.guestPhone && quote.guestEmail && " · "}
+          {quote.guestEmail && `Email ${quote.guestEmail}`}
         </p>
       </div>
       <div className="px-4 pb-4 pt-1 space-y-2">
@@ -483,6 +491,32 @@ export function BookingSummaryCard({ quote, actions }: { quote: ConciergeQuote; 
           </button>
           <button type="button" className="btn btn-ghost" disabled={actions.disabled} onClick={actions.onEdit}>
             <Pencil size={14} /> Change something
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={actions.disabled}
+            onClick={() => actions.onSend("I'd like to change the dates.")}
+          >
+            Change dates
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={actions.disabled}
+            onClick={() => actions.onSend("I'd like to change the room type.")}
+          >
+            Change room
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={actions.disabled}
+            onClick={() => actions.onSend("I'd like to change the number of guests.")}
+          >
+            Change guests
           </button>
         </div>
         <p className="text-[11px] muted">Nothing is booked until you confirm. No payment is taken online.</p>

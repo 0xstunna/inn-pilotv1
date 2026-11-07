@@ -3,7 +3,7 @@
  * conversation row, and a message bubble.
  */
 import type { ReactNode } from "react";
-import { BellRing, Bot, Building2, Globe, Headset, Instagram, Mail, MessageCircle } from "lucide-react";
+import { BellRing, Bot, Building2, CalendarDays, Globe, Headset, Instagram, Mail, MessageCircle, User2 } from "lucide-react";
 
 import {
   BOOKING_STATE_LABEL,
@@ -12,6 +12,9 @@ import {
   selectedHotelLabel,
   STATUS_LABEL,
   LEAD_LABEL,
+  PIPELINE_STAGE_LABEL,
+  NEXT_ACTION_LABEL,
+  NEXT_ACTION_TONE,
   relativeTime,
   snippet,
   type Channel,
@@ -20,6 +23,8 @@ import {
   type ConversationMessage,
   type Handler,
   type LeadAssessment,
+  type NextAction,
+  type PipelineStage,
 } from "../../lib/conversations";
 import { FOLLOW_UP_KIND_LABEL, waitedLabel, type FollowUp } from "../../lib/followUps";
 import { LEAD_EMOJI, LEAD_MEANING } from "../../lib/leadScoring";
@@ -32,15 +37,27 @@ const CHANNEL_STYLE: Record<Channel, { icon: ReactNode; color: string; soft: str
   email: { icon: <Mail size={12} />, color: "var(--info-text)", soft: "var(--info-soft)" },
 };
 
-export function ChannelBadge({ channel, mock }: { channel: Channel; mock?: boolean }) {
+export function ChannelBadge({ channel, mock, configured }: { channel: Channel; mock?: boolean; configured?: boolean }) {
   const style = CHANNEL_STYLE[channel];
+  const isWeb = channel === "web";
+  const title = mock
+    ? `${CHANNEL_LABEL[channel]} (simulated — sample data only)`
+    : isWeb
+      ? "AI Concierge — website chat"
+      : configured
+        ? `${CHANNEL_LABEL[channel]} — connected`
+        : `${CHANNEL_LABEL[channel]} — not configured (add credentials in Settings)`;
   return (
     <span
       className="badge badge-plain"
-      style={{ background: style.soft, color: style.color, borderColor: "transparent" }}
-      title={mock ? `${CHANNEL_LABEL[channel]} (simulated in this demo)` : CHANNEL_LABEL[channel]}
+      style={{
+        background: mock ? "var(--warning-soft)" : style.soft,
+        color: mock ? "var(--warning-text)" : style.color,
+        borderColor: "transparent",
+      }}
+      title={title}
     >
-      {style.icon} {CHANNEL_LABEL[channel]}
+      {style.icon} {CHANNEL_LABEL[channel]}{!isWeb && !mock && configured === false && <span className="text-[10px] ml-1" style={{ opacity: 0.7 }}>(setup required)</span>}
     </span>
   );
 }
@@ -141,6 +158,58 @@ export function FollowUpBadge({ followUp }: { followUp: FollowUp | null }) {
   );
 }
 
+/** Which stage of the lead pipeline this conversation is at. */
+export function PipelineBadge({ stage }: { stage: PipelineStage }) {
+  const tone = {
+    new: "badge-neutral",
+    qualified: "badge-info",
+    quoted: "badge-info",
+    interested: "badge-success",
+    followUp: "badge-warning",
+    booked: "badge-success",
+    lost: "badge-neutral",
+  }[stage];
+  return (
+    <span className={`badge badge-plain ${tone}`} title={PIPELINE_STAGE_LABEL[stage]}>
+      {PIPELINE_STAGE_LABEL[stage]}
+    </span>
+  );
+}
+
+/** The next recommended action for staff. */
+export function NextActionBadge({ action }: { action: NextAction | null }) {
+  if (!action) return null;
+  return (
+    <span
+      className={`badge badge-plain ${NEXT_ACTION_TONE[action]}`}
+      title={NEXT_ACTION_LABEL[action]}
+    >
+      {NEXT_ACTION_LABEL[action]}
+    </span>
+  );
+}
+
+/** Who this conversation is assigned to, or "Unassigned". */
+export function AssignedStaffBadge({ conversation }: { conversation: Conversation }) {
+  const hasAssignment = Boolean(conversation.assignedStaffId);
+  return (
+    <span
+      className={`badge badge-plain ${hasAssignment ? "badge-info" : "badge-neutral"}`}
+      title={hasAssignment ? `Assigned to ${conversation.assignedStaffName}` : "Unassigned — click to assign"}
+    >
+      {hasAssignment ? (
+        <>
+          <User2 size={12} /> {conversation.assignedStaffName}
+        </>
+      ) : (
+        <>
+          <User2 size={12} /> Unassigned
+        </>
+      )}
+    </span>
+  );
+}
+
 export function GuestAvatar({ conversation, size = 40 }: { conversation: Conversation; size?: number }) {
   const initials =
     conversation.guestName
@@ -179,6 +248,7 @@ export function ConversationRow({
   onSelect,
   now,
   hotelName,
+  channelConfig,
 }: {
   conversation: Conversation;
   followUp: FollowUp | null;
@@ -186,6 +256,7 @@ export function ConversationRow({
   onSelect: () => void;
   now: Date;
   hotelName: string;
+  channelConfig?: Record<string, boolean>;
 }) {
   const last = conversation.lastMessage;
   return (
@@ -211,20 +282,36 @@ export function ConversationRow({
         <span className="block text-sm truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>
           {last ? `${ROLE_PREFIX[last.role]}${snippet(last.text)}` : "No messages yet"}
         </span>
+        {conversation.inquiry.checkIn || conversation.inquiry.guestCount && (
+          <span className="block text-xs mt-0.5 flex items-center gap-1" style={{ color: "var(--text-secondary)" }}>
+            <CalendarDays size={12} />
+            {conversation.inquiry.checkIn && conversation.inquiry.checkOut ? (
+              <>
+                {conversation.inquiry.checkIn} → {conversation.inquiry.checkOut}
+                {conversation.inquiry.guestCount && ` · ${conversation.inquiry.guestCount} guest${conversation.inquiry.guestCount === 1 ? "" : "s"}`}
+              </>
+            ) : conversation.inquiry.guestCount ? (
+              `${conversation.inquiry.guestCount} guest${conversation.inquiry.guestCount === 1 ? "" : "s"}`
+            ) : null}
+          </span>
+        )}
         <span className="flex flex-wrap gap-1.5 mt-2">
-          <ChannelBadge channel={conversation.channel} mock={conversation.mock} />
+          <ChannelBadge channel={conversation.channel} mock={conversation.mock} configured={channelConfig?.[conversation.channel]} />
           <HandlerBadge handledBy={conversation.handledBy} />
           <LeadBadge lead={conversation.lead} />
           <StatusBadge conversation={conversation} />
           <SelectedHotelBadge conversation={conversation} hotelName={hotelName} />
           <FollowUpBadge followUp={followUp} />
+          <PipelineBadge stage={conversation.pipelineStage} />
+          <NextActionBadge action={conversation.nextAction} />
+          <AssignedStaffBadge conversation={conversation} />
         </span>
       </span>
     </button>
   );
 }
 
-const ROLE_LABEL = { guest: "", ai: "AI concierge", staff: "Staff" } as const;
+const ROLE_LABEL = { guest: "", ai: "AI concierge", staff: "Staff", internal_note: "Internal note" } as const;
 
 export function MessageBubble({ message, guestName }: { message: ConversationMessage; guestName: string }) {
   const fromGuest = message.role === "guest";

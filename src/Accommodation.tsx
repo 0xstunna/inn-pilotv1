@@ -568,7 +568,7 @@ export default function AccommodationDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Accommodation"
+        title="Rooms"
         subtitle="Rooms, reservations, check-ins and check-outs"
         actions={
           <>
