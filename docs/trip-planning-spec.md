@@ -4,13 +4,13 @@ Status: **LATER — pitch / roadmap only. Not part of the challenge MVP.**
 
 ## Criteria read
 
-Challenge success metric: **inquiry → confirmed-booking conversion for a single stay**. `MVP_SCOPE.md` golden path is one natural-language inquiry → one confirmed reservation (single room type, single hotel selection, one real `RSV-…` reference). `MVP_SCOPE.md` lists "advanced recommendation algorithms" out of scope. No existing tool supports multiple legs or recommendations — the six tools (`search_hotels`, `check_availability`, `get_hotel_info`, `calculate_stay_price`, `prepare_booking`, `create_reservation`) all serve a single stay, and none takes a `hotelId` or multiple legs.
+Challenge success metric: **inquiry → confirmed-booking conversion for a single stay**. `MVP_SCOPE.md` golden path is one natural-language inquiry → one confirmed reservation (single room type, single hotel selection, one real `RSV-…` reference). `MVP_SCOPE.md` lists "advanced recommendation algorithms" out of scope. No existing tool supports multiple legs or recommendations — the five tools (`check_availability`, `get_hotel_info`, `calculate_stay_price`, `prepare_booking`, `create_reservation`) all serve a single stay at one hotel, and none takes a `hotelId` or multiple legs.
 
 ## MVP (what exists today — do not extend)
 
-- Single destination, dates, party size, room type → 3–5 options across listed hotels (network search; scorecard 9/10, the strongest area).
+- Single destination, dates, party size, room type → available options at one hotel (hotel search; no cross-hotel comparison).
 - One booking per conversation: re-check availability + price, explicit confirmation, real `RSV-…` reference, staff see it in Accommodation + Inbox.
-- Two entry points only: network-wide `/#/` and per-hotel scoped `/#/c/:publicHotelId`.
+- Two entry points only: `/` landing page and per-hotel scoped `/#/c/:publicHotelId`.
 
 ## LATER (pitch only)
 

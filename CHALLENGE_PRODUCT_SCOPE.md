@@ -1,11 +1,11 @@
 # InnPilot — Challenge Product Scope
 
 ## Product promise
-InnPilot is an AI booking concierge for participating hotels. It helps guests discover suitable accommodation, compare room types and prices, check date-specific availability, and complete a reservation with clear confirmation. Hotel staff manage room inventory, inquiries and reservations.
+InnPilot is an AI booking concierge for one hotel at a time. It helps guests check the hotel's room types and prices, check date-specific availability, and complete a reservation with clear confirmation. Hotel staff manage room inventory, inquiries and reservations.
 
 ## Primary guest journey
 1. Guest describes destination/property, dates, party size and room needs.
-2. Concierge finds eligible hotels and checks room inventory, date availability and rates.
+2. Concierge checks the hotel's room inventory, date availability and rates.
 3. Guest compares options with nightly and total-stay pricing.
 4. Guest supplies booking details and explicitly confirms.
 5. The system rechecks availability/pricing and creates a reservation reference; staff can see the reservation and conversation.
@@ -17,7 +17,8 @@ InnPilot is an AI booking concierge for participating hotels. It helps guests di
 - Settings: hotel profile and public concierge configuration.
 
 ## Out of scope for the challenge MVP
-Restaurant POS, bar sales/stock, parking operations, expense tracking and broad department-finance reporting are not part of the primary navigation or challenge journey. Legacy code/data is retained for safer migration, but legacy URLs redirect to Accommodation.
+
+Marketplace, cross-hotel search, hotel directory, or OTA-style discovery/comparison. Restaurant POS, bar sales/stock, parking operations, expense tracking and broad department-finance reporting are not part of the primary navigation or challenge journey. Legacy code/data is retained for safer migration, but legacy URLs redirect to Accommodation.
 
 ## Room inventory quality rule
 A room count is not inventory. Before publishing a live hotel listing, staff should verify every room identifier, room type, capacity, price and operational status. Starter inventory and sample rates must not be represented as verified hotel facts. Never claim availability unless the booking service confirms it for the requested dates.

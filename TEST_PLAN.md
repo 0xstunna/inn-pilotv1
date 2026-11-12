@@ -350,7 +350,39 @@ reminder clearing; the AI concierge still on the chat afterwards; the count
 dropping; and "Not now" taking a guest off the list without writing
 anything to them.
 
-## 13. Production readiness (Phase 7)
+## 13. Guest requests & complaints (R13/R14, D33)
+
+**Automated (unit, no emulator)**
+- `tests/unit/guestRequest.test.ts` (14):
+  - `REQ-YYYYMMDD-XXXXXX` id format (date in UTC + 6-char alphabet without ambiguous 0/O/1/I);
+  - `validStatusTransitions()` / `isValidStatusTransition()` for every current→next pair; `closed` is terminal (no outgoing);
+  - `departmentFor()` defaults per category (housekeeping→Housekeeping … safety→Management);
+  - `defaultPriority()` (safety→urgent, billing→high, else normal);
+  - `classifyGuestMessage()`: complaint/request/feedback typing, category keyword hits, safety/billing priority boost, confidence reasons; confidence "low" never hints the model.
+
+**Automated (server, emulator on :8080; no AI key needed)**
+- `tests/server/guestRequestTool.test.ts` (8):
+  - `log_guest_request` creates `hotels/{hotelId}/guestRequests/{id}` with id, reference, department, timestamps, status `new`, notes `[]`;
+  - enum validation rejects invalid type/category/priority/channel and missing summary;
+  - unknown hotel rejected (`unknown_hotel`);
+  - dedupe: same guest excerpt within the 60-minute window → `duplicate`, same id; different excerpt → new record;
+  - rate limit: 5 per conversation per window, then `rate_limited`; independent per conversation;
+  - tool validates enums only — the model sets priority (safety→urgent etc. comes from the classifier hint).
+- `tests/server/whatsappGuestRequest.test.ts` (6): simulated signed HMAC-SHA256 payloads:
+  - complaint/request message routes through the SAME gateway as web (`channel: "whatsapp"`), no duplicate logic, guestRequest ack in the gateway output;
+  - duplicate event id → not reprocessed (status `duplicate`);
+  - invalid signature → 401, no record, no model call;
+  - unregistered phone number id → 400, no record;
+  - `phone_number_id` routes to the owning hotel (tenant isolation).
+
+**Manual (browser, against the local API + emulator)**
+- `/dashboard/requests` shows the live queue with KPI strip (total/new/open/urgent); filters by status, category, channel and type; search matches reference, guest name and summary; a row opens its detail view.
+- Detail view: acknowledge/in-progress/resolve/close only offers valid transitions (can't close from `new` directly is allowed by the transition map — any transition is valid from `new`, but `closed` can't be un-closed); assign to "Me"; internal note appears in the notes history; the "Linked conversation" button opens `/dashboard/inbox`.
+- Inbox header shows "Requests N" badge linking to `/dashboard/requests` when there are new requests.
+- Web guest: complaint/request → concierge replies with reference number + "staff will follow up", no refund/resolution-time promise; `GuestRequestAckCard` appears in the chat; urgent/safety flips the thread to Human (staff take over).
+- WhatsApp guest: same message → same acknowledgement delivered through the reply (simulated; no Cloud API credentials).
+
+## 14. Production readiness (Phase 7)
 
 **Automated, no account needed**
 - `npm run verify:vercel` (8 checks with the emulator, 7 without): every

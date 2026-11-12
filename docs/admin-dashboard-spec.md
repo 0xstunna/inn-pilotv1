@@ -18,7 +18,7 @@ Operator console: one hotel at a time, workspace id is the key (`/#/staff` → `
 
 - **Funnel KPI cards on the existing dashboard** — inquiries (conversations created in range), quoted (`bookingStatus === "quoted"`), confirmed (`bookingStatus === "booked"` + `reservationId` present), conversion % = confirmed ÷ inquiries × 100. Computed in-memory from existing snapshots — **no new collections, no persistent rollup**. Label the looseness: every conversation counts as an inquiry, including general questions.
 - **Reservations list / detail** — existing Accommodation list; detail shows reservationId (`RSV-…`), guest name, phone, room type, dates, nights, total, currency, `source` ("concierge" vs front-desk), payment status ("Pending — pay at hotel"), status, createdAt. Displays `countryOfResidence` only if the field exists (it does not yet — adding it is the small booking-field change in the roadmap).
-- **Concierge on/off** — toggle `listed: true/false` on the hotel listing. When off, the hotel drops out of network search and `/c/:id` returns not-found. Wired through Settings (currently deferred D13/D14 — a concrete "should do" candidate).
+- **Concierge on/off** — toggle `listed: true/false` on the hotel listing. When off, the hotel's concierge link returns not-found. Wired through Settings (currently deferred D13/D14 — a concrete "should do" candidate).
 - **Inbox** — existing `Inbox.tsx`: take over / reply / hand back to AI / close / snooze, lead-score and status badges, selected-hotel badge, filters. Empty state: "No conversations yet — share your concierge link."
 - **Platform admin** — none for the demo. Show a clearly simulated/mocked screen with illustrative metering numbers, labeled **"simulated — not connected to real metering"**.
 

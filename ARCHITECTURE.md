@@ -58,12 +58,14 @@ from model prose.
 
 | | Public (guest) | Staff (hotel team) |
 | --- | --- | --- |
-| Routes | `/#/` concierge; `/#/c/:publicHotelId` concierge scoped to one hotel | `/#/staff` (entry, open or create a workspace), `/#/dashboard/*` (PMS), `/#/pms` → dashboard |
+| Routes | `/` landing page; `/#/c/:publicHotelId` concierge scoped to one hotel | `/#/staff` (entry, open or create a workspace), `/#/dashboard/*` (PMS), `/#/pms` → dashboard |
 | Identity | none | the workspace `hotelId`, held in `localStorage` (D2) |
 | Data access | only through `/api/ai/*` | Firestore client SDK, constrained by `firestore.rules` |
 | Writes | server-controlled only (Admin SDK) | rules-validated workspace writes |
 
-A guest has no workspace id, so `/#/dashboard/*` redirects them to `/#/staff`.
+A guest has no workspace id. The public entry point is `/` (marketing landing page); a hotel's concierge is at `/#/c/:publicHotelId`.
+
+> **Note (D32):** DECISIONS D32 ("Hotel-first, no network") supersedes D23, D24, D25 and D29. Every conversation belongs to exactly one hotel. The network directory, cross-hotel search (`search_hotels`, `GET /api/ai/network`) and multi-hotel canonical threads are being removed; see PRODUCT.md.
 
 ## 3. Firestore data model
 
@@ -110,18 +112,18 @@ conciergeConversations/{id}            CANONICAL guest thread, server-only
 | Module | Responsibility |
 | --- | --- |
 | `server/admin.ts` | Lazy Firebase Admin init (service account / ADC / emulator). |
-| `server/hotels.ts` | `resolveHotel(publicId)` → `HotelScope`; `scopeForHotelId()` (server-internal, for inbox mirrors); `listNetworkHotels()` (hotels with `listed: true`). A scope can only reach `hotels/{hotelId}/…`. |
-| `server/network.ts` | `NetworkContext`: which hotels this conversation may reach (all listed hotels, or exactly one hotel for `/c/:publicHotelId`), destination matching, option ranking. |
-| `server/ai/tools/*` | The six tools. Each resolves the hotel through the network context from a **public id**, never a hotelId. |
+| `server/hotels.ts` | `resolveHotel(publicId)` → `HotelScope`; `scopeForHotelId()` (server-internal, for inbox mirrors). A scope can only reach `hotels/{hotelId}/…`. |
+| `server/network.ts` | `NetworkContext`: resolves one hotel per conversation (the `/c/:publicHotelId` scope). Destination matching and option ranking are per-hotel only. |
+| `server/ai/tools/*` | Five tools (`check_availability`, `get_hotel_info`, `calculate_stay_price`, `prepare_booking`, `create_reservation`). Each resolves the hotel from a **public id**, never a hotelId. `search_hotels` is removed per D32. |
 | `server/ai/prompts/concierge.ts` | The concierge system instruction (identity, rules, booking protocol). |
 | `server/ai/provider.ts` | Picks the model service per request from `AI_PROVIDER` (D31). |
 | `server/ai/groq.ts` | Default provider (`groq-sdk`, `GROQ_MODEL`): tool rounds, turn timeout, one bounded retry, 429 `retry-after` handling, malformed-output checks. |
 | `server/ai/gemini.ts` | Alternative provider, same contract. |
-| `server/guestConversations.ts` | Canonical thread + per-hotel inbox mirrors; handoff state; pending booking. |
+| `server/guestConversations.ts` | Canonical thread for one hotel + its inbox mirror; handoff state; pending booking. |
 | `server/conversations.ts` | Writes one turn into one hotel's mirror (lead score, follow-up clock). |
 | `api/ai/concierge.ts` | `POST` guest turn. |
 | `api/ai/conversation.ts` | `GET` staff replies for the guest page (polling). |
-| `api/ai/network.ts` | `GET` participating destinations for the home page (no model call). |
+| `api/ai/network.ts` | Superseded by D32 — `GET /api/ai/network` (hotel directory) is removed. |
 | `api/ai/hotel.ts` | `GET` one hotel's public header (scoped page). |
 | `api/ai/health.ts` | `GET` configuration / probe. |
 
@@ -154,19 +156,16 @@ document), `conversations.ts`, `leadScoring.ts`, `followUps.ts`,
    stays, books the cheapest free room of that type, writes the
    `accomodation` document (`source: "concierge"`) and an audit entry, and
    returns the real `reservationId`. If the price moved, nothing is booked.
-8. The page shows **Booking confirmed** with the reference. The booked hotel's
-   inbox mirror is `booked`; other hotels' mirrors are marked booked
-   elsewhere (status Closed). Staff open Accommodation and see the booking.
+8. The page shows **Booking confirmed** with the reference. The hotel's inbox mirror is `booked`; staff open Accommodation and see the booking.
 
 ## 6. Human handoff
 
 Staff take over from the hotel's inbox (`handledBy: "human"` on their mirror).
-On the next guest turn the gateway reads the mirrors of every attached hotel;
-if any is human-handled it makes **no model call**, records the guest's
-message and returns a holding reply. The guest page polls
-`GET /api/ai/conversation` (5 s while staff handle it, 15 s otherwise), which
-merges staff messages from every attached mirror by server time. Handing back
-sets `handledBy: "ai"`.
+On the next guest turn the gateway reads the mirror for that one hotel; if it
+is human-handled it makes **no model call**, records the guest's message and
+returns a holding reply. The guest page polls `GET /api/ai/conversation`
+(5 s while staff handle it, 15 s otherwise), which merges staff messages by
+server time. Handing back sets `handledBy: "ai"`.
 
 ## 7. Security model
 
@@ -175,8 +174,7 @@ sets `handledBy: "ai"`.
 - Guests cannot write Firestore at all: `conciergeConversations` and
   `publicHotels` are client-denied, `reservations` is server-only, and every
   other write needs a workspace id the guest never sees.
-- Tools accept public ids only; an unlisted hotel is unreachable from the
-  network concierge, and a scoped `/c/` conversation can reach only its hotel.
+- Tools accept public ids only; an unlisted hotel is unreachable from the concierge, and a scoped `/c/` conversation can reach only its hotel.
 - A booking needs two server-enforced conditions beyond the model's intent:
   a summary shown in an earlier turn, and an explicit confirmation message.
 - Staff access is the unchanged workspace-key model (D2/D3): unguessable,
@@ -186,7 +184,7 @@ sets `handledBy: "ai"`.
 
 ```bash
 npx firebase emulators:start --only firestore        # Java required
-npm run seed:k-hotels                                 # demo network, emulator only
+npm run seed:k-hotels                                 # demo data, emulator only
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_PROJECT_ID=innpilot-demo npm run dev:api
 VITE_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 VITE_FIREBASE_PROJECT_ID=innpilot-demo npm run dev
 ```

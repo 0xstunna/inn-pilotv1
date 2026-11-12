@@ -1,5 +1,8 @@
 # AGENTS.md (InnPilot)
 
+Product direction: hotel-first, one hotel per conversation, no marketplace or
+cross-hotel search — see PRODUCT.md (decided in D32, superseding D23/D24/D25/D29).
+
 ## Repo shape
 - Vite + React 19 + TS; HashRouter. `src/` app, `api/ai/*` Vercel functions, `server/` AI/network/Admin, `tests/` (rules/unit/server).
 - Firebase: Firestore (emulator :8080), rules in `firestore.rules`/`storage.rules`. Admin SDK in `server/admin.ts` (lazy; uses emulator if `FIRESTORE_EMULATOR_HOST`, else `FIREBASE_SERVICE_ACCOUNT` JSON/base64, else ADC). Service account must never be `VITE_*`.

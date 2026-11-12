@@ -230,8 +230,7 @@ Follow this script to demonstrate the full workflow:
 
 5. **Search and compare**
    - AI searches actual availability
-   - Review results with real prices, amenities, and capacity
-   - Compare options across properties
+   - Review results with real prices, amenities, and capacity for this hotel
 
 6. **Complete booking**
    - Select preferred option
@@ -261,4 +260,4 @@ Follow this script to demonstrate the full workflow:
 
 ## License
 
-Built by Masai Labs for the K Hotels AI Innovation Challenge.
+Built by Masai Labs for InnPilot.

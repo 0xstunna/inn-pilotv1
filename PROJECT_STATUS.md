@@ -33,6 +33,7 @@ The status of the pre-restructure build (the single-hotel product) is archived a
 | 7 End-to-end verification | ✅ browser 37/37 (stand-in model) · ✅ live Gemini turns 1–2 |
 | 8 Build + deployment readiness | ✅ locally · ⛔ deploy gated |
 | 9 Groq free-plan provider (D31) | ✅ automated · ✅ **live Groq golden path, search → reservation** |
+| 10 Requests & complaints (R13/R14, D33) | ✅ automated · 🟡 UI not clicked through |
 
 ## Phase 0 — audit
 
@@ -46,14 +47,14 @@ The status of the pre-restructure build (the single-hotel product) is archived a
 
 | Item | Status | Evidence |
 | --- | --- | --- |
-| Six tools: `search_hotels`, `check_availability`, `get_hotel_info`, `calculate_stay_price`, `prepare_booking`, `create_reservation`; none takes a hotelId | ✅ | `server/ai/tools/`; `tests/server/tools.test.ts` "offers exactly the six concierge tools" |
-| Network context: listed hotels only, or exactly one hotel on its own link; public ids only | ✅ | `server/network.ts`; `tests/server/tenantIsolation.test.ts` (22) |
+| Five tools: `check_availability`, `get_hotel_info`, `calculate_stay_price`, `prepare_booking`, `create_reservation`; none takes a hotelId | ✅ | `server/ai/tools/`; `tests/server/tools.test.ts` "offers exactly the five concierge tools" |
+| Hotel scope: exactly one hotel per conversation; public ids only | ✅ | `server/hotels.ts`; `tests/server/tenantIsolation.test.ts` (22) |
 | Concierge system instruction: identity, mission, the 12 rules, booking protocol, date resolution | ✅ | `server/ai/prompts/concierge.ts`; gateway test asserts identity line |
 | No example prices in the prompt that a model could copy | ✅ | placeholders only |
 | Gateway: allow-listed `search` / `availability` / `quote` / `booking` cards; no hotelId to guest or model | ✅ | `api/ai/concierge.ts`; golden-path test scans every response and model request |
 | Real Gemini conversation | ✅ turns 1–2 · ⛔ turns 3–4 | Two runs 2026-09-16 with the real key: the exact demo request → `search_hotels` with 10–15 Oct, Western Uganda, Double → 3 real options (Fort Portal 850,000 · Kabale 900,000 · Mbarara Deluxe Double 1,050,000 UGX), then choosing option 1 → model asked for full name and phone. Turn 3 hit HTTP 429: first the 5/minute limit, then the 20/day free-tier limit (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`). The concierge returned the guest-safe error and recorded the turn. |
 
-## Phase 3 — multi-hotel search (D24)
+## Phase 3 — per-hotel search (superseded by D32)
 
 | Item | Status | Evidence |
 | --- | --- | --- |
@@ -104,7 +105,7 @@ The status of the pre-restructure build (the single-hotel product) is archived a
 
 | Item | Status | Evidence |
 | --- | --- | --- |
-| `/#/` AI Concierge home: "Find your stay with AI", explanation, large composer, the 4 suggested searches, participating properties from `/api/ai/network`, how-it-works | ✅ | browser checks; `src/pages/concierge/ConciergePage.tsx` |
+| `/` LandingPage: marketing page for one hotel, "Try the guest concierge" button linking to the hotel's `/#/c/:publicHotelId`, how-it-works | ✅ | browser checks; `src/pages/home.tsx` |
 | Result cards: hotel, location, room type, capacity, price/night, nights, total, availability, amenities, Choose | ✅ | browser checks |
 | Booking summary card with Confirm / Change; "Booking Confirmed" card with reference, hotel, room, guest, dates, total | ✅ | browser checks + screenshots |
 | `/#/c/:publicHotelId` scoped concierge; unknown id → safe not-found | ✅ | browser checks |
@@ -152,6 +153,24 @@ Failure handling (automated, scripted Gemini + emulator): no hotels in destinati
 | `npm run verify:vercel` (emulator) | ✅ 9/9 — all 5 functions bundle and answer; health reports `provider=groq model=openai/gpt-oss-120b`, no key in any bundle or response |
 | Vercel deployment, `firestore.rules` deploy, production Firestore writes | ⛔ GATED — not done; needs explicit approval and account access |
 
+## Phase 10 — Requests & complaints (R13/R14, D33)
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Deterministic pre-classifier `classifyGuestMessage()` — keywords/patterns, zero model calls, confidence + reasons | ✅ | `tests/unit/guestRequest.test.ts` (14/14) |
+| `log_guest_request` tool: enum validation, 60-minute dedupe by excerpt, 5/hour per-conversation rate limit, record + audit in one `HotelScope` transaction | ✅ | `tests/server/guestRequestTool.test.ts` (8/8) |
+| Classifier hint appended to system prompt; model decides whether to call the tool (one model call per turn) | ✅ | `server/ai/conciergeTurn.ts` + prompt rule in `server/ai/prompts/concierge.ts` |
+| AI never promises refund/compensation/resolution time; acknowledges + reference + "staff will follow up" | ✅ | prompt rule + `GuestRequestAck.message`; unit + gateway tests |
+| Urgent/safety → `handledBy: "human"` mirror flip (AI goes quiet) | ✅ | `conciergeTurn.ts` post-turn flip; webhook test asserts channel=whatsapp |
+| Web channel: `guestRequest?` on `ChatEntry`; `GuestRequestAckCard` rendered in `MessageBubble` | ✅ | `src/lib/concierge.ts`, `src/pages/concierge/parts.tsx` |
+| WhatsApp: same shared `processGuestTurn` gateway (channel=`whatsapp`), no duplicate logic; simulated signed HMAC payloads | ✅ | `tests/server/whatsappGuestRequest.test.ts` (6/6); mounted `/api/ai/webhook/whatsapp` + `/api/ai/channels` in `server/dev-server.ts` |
+| Staff Requests queue `/dashboard/requests`: filters (status, category, channel, type + search), KPI strip, row→detail | ✅ | `src/pages/requests/RequestQueue.tsx`, `parts.tsx`; tsc + lint clean |
+| Request detail: acknowledge/start-work/resolve/close (valid transitions only), assign, internal note, link to conversation | ✅ | `src/pages/requests/RequestDetail.tsx`; tsc + lint clean |
+| Inbox header badge/link: new-request count → `/dashboard/requests` | ✅ | `src/pages/inbox/Inbox.tsx` |
+| `firestore.rules`: `guestRequestOk()` validator + `guestRequests/{requestId}` match block (not deployed) | ✅ | `firestore.rules` lines 282–362 |
+| `npm run lint` on all new/changed files | ✅ | no findings |
+| `tsc` server clean; `tsc` app only the 2 pre-existing `ConciergePage.tsx` errors (unchanged) | ✅ | `tsconfig.server.json` / `tsconfig.app.json` |
+
 ## Production-readiness audit (2026-09-17)
 
 | Check | Result |
@@ -182,13 +201,13 @@ Failure handling (automated, scripted Gemini + emulator): no hotels in destinati
 ## Known issues
 
 1. `serviceAccountKey.json` (production, `hotel-management-c183c`) was moved out of the project on 2026-09-17 (it was never committed). It is still a full-access key on the machine; revoke it when no longer needed.
-2. A network conversation that never reaches search results (e.g. no hotel in the destination) is recorded canonically but appears in no hotel's inbox (D29).
-3. A staff reply at one hotel is not copied into other hotels' mirrors of the same guest (D29).
+2. A conversation that never reaches a booking (e.g. guest abandons) is recorded canonically but appears in the one hotel's inbox.
+3. A staff reply at one hotel is recorded on that hotel's mirror of the guest thread.
 4. Confirmation detection and lead scoring are English-only.
 5. Groq free plan (D31): 8K tokens/minute means about one tool turn per 40 s across **all** guests; concurrent guests will get the safe "try again" message. 1K requests/day ≈ 140 full booking conversations.
 6. The deployed rules have not changed on any real project; the new listing and mirror fields need the updated `firestore.rules` deployed (gated).
 7. Settings → AI Concierge listing has not been clicked through in a browser.
-8. `scripts/verify/concierge-live.ts` (`npm run verify:live`) predates the network restructure and was not re-run; the browser golden path is the live check.
+8. `scripts/verify/concierge-live.ts` (`npm run verify:live`) predates the hotel-first restructure and was not re-run; the browser golden path is the live check.
 9. Six old screenshots (`01-…06-*.png`) remain in the repository root from the previous build.
 
 ## Next actions (need the user)

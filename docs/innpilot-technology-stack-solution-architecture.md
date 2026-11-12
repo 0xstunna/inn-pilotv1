@@ -26,12 +26,12 @@ The architecture is organised into the following components:
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| Guest communication | Web chat (`/#/` and `/#/c/:publicHotelId`) | Primary channel through which guests interact with the concierge — no login required |
+| Guest communication | Web chat (`/` landing page; `/#/c/:publicHotelId` concierge scoped to one hotel) | Primary channel through which guests interact with the concierge — no login required |
 | Conversational interface | React 19 + Vite + Tailwind CSS v4 (frontend); HashRouter | Guest-facing UI, mobile-first, conversation area, result cards, booking summary and confirmation cards |
 | AI provider | Groq (default `openai/gpt-oss-120b`) or Google Gemini | Interprets guest messages, drives the tool-use loop, generates responses |
-| API layer | Vercel serverless functions (`/api/ai/*`); local dev server (`server/dev-server.ts`) | Framework-free handlers for concierge, network, hotel, conversation, and health endpoints |
+| API layer | Vercel serverless functions (`/api/ai/*`); local dev server (`server/dev-server.ts`) | Framework-free handlers for concierge, hotel, conversation, and health endpoints |
 | Conversational AI engine | `server/ai/` — provider seam, prompts, tools | Tool loop, system instruction (12 rules + booking protocol), server-enquired booking safety |
-| Concierge tools | `search_hotels`, `check_availability`, `get_hotel_info`, `calculate_stay_price`, `prepare_booking`, `create_reservation` | Live inventory, availability, pricing, booking preparation, reservation creation — none takes a `hotelId` from the guest/model |
+| Concierge tools | `check_availability`, `get_hotel_info`, `calculate_stay_price`, `prepare_booking`, `create_reservation` | Live inventory, availability, pricing, booking preparation, reservation creation — none takes a `hotelId` from the guest/model |
 | Data store | Firebase Firestore (emulator `:8080` locally) | Hotels, rooms, accommodations/bookings, conversations, public ID mappings |
 | Admin SDK | `server/admin.ts` (lazy; emulator or service account / ADC) | Server-side writes: canonical conversations, reservations, audit entries |
 | Auth / access | Workspace-id based; no guest or staff user accounts | `hotelId` is the workspace key; `conciergeConversations` and `publicHotels` are client-denied |
@@ -45,13 +45,13 @@ The architecture separates the guest-facing conversational experience from backe
 
 ### A. Guest communication and conversational layer
 
-Guests open the concierge at `/#/` (network-wide) or `/#/c/:publicHotelId` (scoped to one hotel, via the link a hotel shares from Settings). No account is required. The conversation survives a reload within the same tab. The AI drives a bounded tool loop: search → (optionally) check availability → prepare booking → create reservation, with server-enforced re-checks and explicit guest confirmation before any write.
+Guests open the concierge at `/#/c/:publicHotelId` (scoped to one hotel, via the link a hotel shares from Settings). No account is required. The conversation survives a reload within the same tab. The AI drives a bounded tool loop: check availability → prepare booking → create reservation, with server-enforced re-checks and explicit guest confirmation before any write.
 
 ### B. Property knowledge and inventory layer
 
-Each participating property maintains its own data:
+Each property maintains its own data:
 
-- Property profile and public concierge configuration (region, country, description, amenities, check-in/out times, policies, `listed` flag, `publicId`)
+- Property profile and public concierge configuration (region, country, description, amenities, check-in/out times, policies, `publicId`)
 - Room inventory: physical rooms with unique identifiers, room types, capacity, nightly rates, status (editable by staff in Accommodation)
 - Rates: nightly rate × nights; rooms with no rate are never offered
 

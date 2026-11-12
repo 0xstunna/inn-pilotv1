@@ -514,6 +514,7 @@ Concierge (see `MIGRATION_PLAN.md`)._
     concierge.
 - **Consequences:** Staff reach their workspace via `/#/staff`. Nothing in
   the PMS modules changes. Shared concierge links from Settings keep working.
+  Superseded by D32.
 - **Where:** `src/App.tsx`, `src/pages/concierge/`, `src/pages/home.tsx`.
 
 ## D24. Hotels opt in to the network search with `listed: true`
@@ -530,6 +531,7 @@ Concierge (see `MIGRATION_PLAN.md`)._
 - **Consequences:** Existing hotels are unaffected until they opt in.
   `get_hotel_info` and result cards report only fields that exist; anything
   missing is stated as "not recorded", never guessed.
+  Superseded by D32.
 - **Where:** `server/hotels.ts`, `src/lib/hotelListing.ts`,
   `src/pages/Settings.tsx`, `firestore.rules`.
 
@@ -553,6 +555,7 @@ Concierge (see `MIGRATION_PLAN.md`)._
 - **Consequences:** Supersedes D8's "tools get a scope, not an id" in form,
   not in substance: tools still only touch data through a `HotelScope`, now
   obtained from a validated public id.
+  Superseded by D32.
 - **Where:** `server/network.ts`, `server/ai/tools/`.
 
 ## D26. Book by room type; the server picks the room inside the transaction
@@ -629,6 +632,7 @@ Concierge (see `MIGRATION_PLAN.md`)._
   no hotel matches) is recorded canonically but is in no hotel's inbox. A
   staff reply from one hotel is not copied into other hotels' mirrors.
   Writes per turn grow with attached hotels (at most 10).
+  Superseded by D32.
 - **Where:** `server/guestConversations.ts`, `server/conversations.ts`,
   `src/lib/conversations.ts`, `src/pages/inbox/`.
 
@@ -692,3 +696,45 @@ Concierge (see `MIGRATION_PLAN.md`)._
   environment change.
 - **Where:** `server/ai/provider.ts`, `server/ai/groq.ts`, `server/ai/config.ts`,
   `server/network.ts`, `tests/unit/groq.test.ts`, `tests/server/conciergeGroq.test.ts`.
+
+## D32. Hotel-first, no network (supersedes D23, D24, D25, D29)
+
+- **Context:** The network AI Concierge (`/#/` searching every participating
+  hotel, `search_hotels` across the network, multi-hotel canonical threads)
+  treated InnPilot like a marketplace or OTA that routes guests between
+  competitors. That conflicts with the hotel-first product direction: each
+  hotel needs its own inquiries converted, not a directory that sends guests
+  elsewhere.
+- **Decision:** InnPilot solves each individual hotel's internal problems
+  (slow replies, lost inquiries, inquiry-to-booking conversion, staff
+  workload, guest requests and complaints). It does not compete with OTAs or
+  route guests between hotels. Every conversation belongs to exactly one
+  hotel.
+- **Reason:** Hotels need their own inquiries converted, not a marketplace
+  that sends guests to competitors.
+- **Consequences:** D23 (network AI Concierge as the public product), D24
+  (`listed: true` network opt-in), D25 (tools resolve through a multi-hotel
+  network context) and D29 (one canonical thread mirrored into each involved
+  hotel's inbox) are superseded. Every conversation is scoped to exactly one
+  hotel; there is no network directory, no cross-hotel search, and no
+  marketplace surface exposed to guests.
+- **Where:** `DECISIONS.md` (this entry); `PRODUCT.md`.
+
+## D33. Guest requests and complaints are detected, logged and routed to staff (R13/R14)
+
+- **Context:** The Jatigi Stay differentiator — a guest who reports a dirty room, a broken facility, noise, a billing problem or a safety concern, or asks for something that isn't a room booking (late checkout, extra towel, taxi), needs a structured record, a reference number and a promise that staff will follow up. Before D33 the AI answered these in empathic prose only, with no categorization, no record and no staff visibility.
+- **Decision:**
+  - Detection is deterministic and free (no model call): `classifyGuestMessage()` in `src/lib/guestRequest.ts` keywords/patterns the message into type/category/priority/confidence and appends one hint line to the system prompt. The model decides whether to call `log_guest_request` — still one model call per turn, on Groq's free tier.
+  - `log_guest_request` (`server/ai/tools/guestRequest.ts`) validates its enums, dedupes by guest excerpt within a 60-minute window, caps a conversation at 5 requests/hour, then writes `hotels/{hotelId}/guestRequests/{requestId}` (`REQ-YYYYMMDD-XXXXXX`) plus an audit entry through `createGuestRequest` (`server/ai/guestRequests.ts`), all inside the turn's `HotelScope`. The model never sees a `hotelId`; the scope resolves one hotel per conversation (D8/D32).
+  - Default department per category (housekeeping→Housekeeping, maintenance→Maintenance, food_beverage→F&B, front_desk→Front Desk, noise→Front Desk, billing→Accounts, safety→Management, other→Front Desk), from `departmentFor()` in `src/lib/guestRequest.ts`.
+  - Status transitions: `new → {acknowledged,in_progress,resolved,closed}`, `acknowledged → {in_progress,resolved,closed}`, `in_progress → {resolved,closed}`, `resolved → {closed}`, `closed → terminal`, through the single shared `isValidStatusTransition()` / `validStatusTransitions()`.
+  - The AI never promises refunds, compensation or resolution times: it acknowledges, gives the reference number and says staff will follow up. That rule is in the system prompt and is the only guest-facing wording allowed.
+  - Urgent priority or safety category flips the conversation mirror to `handledBy: "human"` (R14 handoff): the AI goes quiet and the Inbox shows Human; staff replies merge via `GET /api/ai/conversation` polling (D19 unchanged).
+  - The web channel shows the acknowledgement as a `GuestRequestAckCard` (reference copy button, department, urgent styling) rendered in `MessageBubble`. The WhatsApp webhook routes the same message through the shared `processGuestTurn` gateway (channel=`whatsapp`) — no duplicate logic — and the acknowledgement text is delivered to the guest through the reply.
+  - Staff manage records on the Requests queue page (`/dashboard/requests`): filters (status, category, channel, type + search), detail view (acknowledge/assign/resolve, add internal note, jump to the linked conversation), and a pending-requests badge on the Inbox header. Writes go through `updateGuestRequestStatus` / `addGuestRequestNote` in `src/lib/guestRequests.ts`, gated by `firestore.rules` (`workspaceWrite`).
+- **Consequences:**
+  - `firestore.rules` gained `guestRequestOk()` and a `guestRequests/{requestId}` match block (read/create/update per hotel; create also by the Admin SDK through `server/ai/guestRequests.ts`). Not deployed (gated per D22).
+  - One extra server tool per turn on top of the booking set — still within Groq's ~5K input-token/tool-turn budget.
+  - Request records are not linked to a booking or reservation; a guest can have several open requests on one thread.
+- **Where:** `src/lib/guestRequest.ts`, `src/lib/guestRequests.ts`, `server/ai/guestRequests.ts`, `server/ai/tools/guestRequest.ts`, `server/ai/conciergeTurn.ts`, `server/ai/prompts/concierge.ts`, `server/ai/types.ts`, `api/ai/concierge.ts`, `src/lib/concierge.ts`, `src/lib/collections.ts`, `src/lib/audit.ts`, `src/pages/concierge/parts.tsx`, `src/pages/requests/`, `src/pages/inbox/Inbox.tsx`, `src/App.tsx`, `src/dashboard.tsx`, `firestore.rules`, `tests/unit/guestRequest.test.ts`, `tests/server/guestRequestTool.test.ts`, `tests/server/whatsappGuestRequest.test.ts`.
+
