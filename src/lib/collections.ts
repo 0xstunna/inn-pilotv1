@@ -23,6 +23,14 @@ export const COLLECTIONS = {
   AUDIT: "auditLog",
   /** Guest conversations for the inbox; see src/lib/conversations.ts. */
   CONVERSATIONS: "conversations",
+  /** Guest requests and complaints (R13/R14); see src/lib/guestRequest.ts. */
+  GUEST_REQUESTS: "guestRequests",
+  /** Top-level mapping: WhatsApp phone number ID → public hotel id, for routing webhooks to the right hotel. */
+  WHATSAPP_PHONE_NUMBER_IDS: "whatsappPhoneNumberIds",
+  /** Top-level record of processed WhatsApp webhook event IDs and their processing lifecycle state. */
+  WHATSAPP_WEBHOOK_EVENTS: "whatsappWebhookEvents",
+  /** Top-level record of a hotel's WhatsApp Business connection (credentials keyed by hotelId). */
+  WHATSAPP_CONNECTIONS: "whatsappConnections",
 } as const;
 
 export type BookingStatus = "Confirmed" | "Checked In" | "Checked Out" | "Cancelled" | "No Show";

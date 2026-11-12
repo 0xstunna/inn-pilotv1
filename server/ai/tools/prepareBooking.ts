@@ -69,7 +69,7 @@ export const prepareBookingTool: ConciergeTool = {
     parameters: {
       type: "object",
       properties: {
-        hotel: { type: "string", description: "The hotel's `hotel` id from a search_hotels result, or its exact hotel name." },
+        hotel: { type: "string", description: "The hotel's `hotel` value from this concierge, or its exact hotel name." },
         roomType: { type: "string", description: "The room type, exactly as a result named it." },
         checkIn: { type: "string", description: "Arrival date, YYYY-MM-DD." },
         checkOut: { type: "string", description: "Departure date, YYYY-MM-DD." },

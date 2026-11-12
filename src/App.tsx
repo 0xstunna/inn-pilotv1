@@ -23,6 +23,8 @@ const ConciergePage = lazy(() => import("./pages/concierge/ConciergePage"));
 const AppShell = lazy(() => import("./dashboard"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Inbox = lazy(() => import("./pages/inbox/Inbox"));
+const RequestQueue = lazy(() => import("./pages/requests/RequestQueue"));
+const RequestDetail = lazy(() => import("./pages/requests/RequestDetail"));
 const Accommodation = lazy(() => import("./Accommodation"));
 const SettingsPage = lazy(() => import("./pages/Settings"));
 
@@ -52,8 +54,8 @@ function App() {
       <ToastProvider>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            {/* The product: the public AI Concierge. No account, no workspace. */}
-            <Route path="/" element={<ConciergePage />} />
+            {/* The product: the public marketing landing page. No account, no workspace. */}
+            <Route path="/" element={<LandingPage />} />
             {/* The same concierge on one hotel's own link: its public id, never its workspace id. */}
             <Route path="/c/:publicHotelId" element={<ConciergePage />} />
 
@@ -89,6 +91,8 @@ function App() {
             >
               <Route index element={<Dashboard />} />
               <Route path="inbox" element={<Inbox />} />
+              <Route path="requests" element={<RequestQueue />} />
+              <Route path="requests/:requestId" element={<RequestDetail />} />
               <Route path="accommodation" element={<Accommodation />} />
               {/* Legacy operational modules are intentionally retired from the challenge MVP. */}
               <Route path="restaurant/*" element={<Navigate to="/dashboard/accommodation" replace />} />

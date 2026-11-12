@@ -33,7 +33,7 @@ export const CONVERSATION_BOOKING_STATES = ["none", "quoted", "booked"] as const
 /** How far the guest got: nothing yet, shown live availability, or booked. */
 export type ConversationBookingState = (typeof CONVERSATION_BOOKING_STATES)[number];
 
-/** Whether a network guest has chosen this hotel, another one, or none yet (D29). */
+/** Whether a guest has chosen this hotel, another one, or none yet (legacy D29; always "this" or "none" now). */
 export const HOTEL_SELECTIONS = ["none", "this", "other"] as const;
 export type HotelSelection = (typeof HOTEL_SELECTIONS)[number];
 
@@ -161,7 +161,7 @@ export interface Conversation {
   selection: HotelSelection;
   /** The hotel the guest chose, when they chose one. */
   selectedHotelName: string;
-  /** The guest booked at another hotel in the network. */
+  /** The guest booked at another hotel (legacy network-era field, always false now). */
   bookedElsewhere: boolean;
   /** Staff marked the conversation closed. */
   closed: boolean;

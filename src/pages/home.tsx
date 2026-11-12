@@ -192,7 +192,7 @@ const LandingPage = () => {
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-3">
           <img src={innpilotLogoLight} alt="InnPilot" className="h-8 w-auto object-contain" />
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-500">
-            <Link to="/" className="hover:text-slate-900 transition inline-flex items-center gap-1.5"><Sparkles size={14} /> Guest concierge</Link>
+            <Link to="/staff/get-started" className="hover:text-slate-900 transition inline-flex items-center gap-1.5"><Sparkles size={14} /> Get Started</Link>
             <a href="#features" onClick={jumpTo("features")} className="hover:text-slate-900 transition">Features</a>
             <a href="#faq" onClick={jumpTo("faq")} className="hover:text-slate-900 transition">FAQ</a>
           </div>
@@ -234,6 +234,15 @@ const LandingPage = () => {
             <div className="flex flex-wrap gap-3">
               <Link to="/staff/get-started" className="btn btn-primary px-6 py-3 text-sm inline-flex items-center gap-2">
                 Get Started <ArrowRight size={16} />
+              </Link>
+              {/* Try the guest concierge on a seeded hotel's own link. Requires `npm run seed:k-hotels` to have been run
+                  against the emulator so a publicId exists at /c/:publicHotelId. No seeded hotel exists in Firestore yet;
+                  see the Phase 1 report for details. */}
+              <Link
+                to="/c/k-hotels-kabale-kh26demo"
+                className="btn btn-secondary px-6 py-3 text-sm inline-flex items-center gap-2"
+              >
+                Try the guest concierge <ArrowRight size={16} />
               </Link>
               <a
                 href="#product"

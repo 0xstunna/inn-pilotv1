@@ -49,7 +49,7 @@ const baseInput = {
   system: "You are a test concierge.",
   messages: [
     { role: "user", content: "I want a double room in Kabale from 2026-11-10 to 2026-11-15 for 2 guests." },
-    { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "search_hotels", arguments: JSON.stringify({ destination: "Kabale", checkIn: "2026-11-10", checkOut: "2026-11-15", guests: 2 }) } }] },
+    { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "check_availability", arguments: JSON.stringify({ destination: "Kabale", checkIn: "2026-11-10", checkOut: "2026-11-15", guests: 2 }) } }] },
     { role: "tool", tool_call_id: "c1", content: JSON.stringify({ status: "ok", options: [{ optionNumber: 1, hotel: "kabale-hotel-1", hotelName: "K Hotels Kabale", city: "Kabale", roomType: "Double", nightlyRate: 220000, nights: 5, stayTotal: 1100000, currency: "UGX" }] }) },
     { role: "user", content: "I'll take option 1. My name is Amina Okello, phone +256 772 123 456." },
     { role: "assistant", content: null, tool_calls: [{ id: "c2", type: "function", function: { name: "prepare_booking", arguments: JSON.stringify({ hotel: "kabale-hotel-1", roomType: "Double", checkIn: "2026-11-10", checkOut: "2026-11-15", guestName: "Amina Okello", guestPhoneNumber: "+256 772 123 456", numberOfGuests: 2 }) } }] },

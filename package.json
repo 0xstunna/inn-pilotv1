@@ -8,7 +8,7 @@
   },
   "main": "electron/main.cjs",
   "author": "Felix Masai",
-  "description": "InnPilot AI Concierge — search K Hotels properties and book a room in one conversation",
+  "description": "InnPilot AI Concierge — the AI booking concierge for one hotel at a time",
   "scripts": {
     "dev": "vite",
     "dev:api": "tsx server/dev-server.ts",

@@ -298,7 +298,7 @@ export const createReservationTool: ConciergeTool = {
     return notBooked(
       "no_longer_available",
       `Nothing was booked: no ${pending.roomType} room is free at ${scope.profile.name} for those dates any more — ` +
-        "someone else booked it. Apologise, then call search_hotels again with the same dates and offer the alternatives."
+        "someone else booked it. Apologise, then check availability again with the same dates and offer the alternatives."
     );
   },
 };

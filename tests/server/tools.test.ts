@@ -21,7 +21,6 @@ import { resolveHotel } from "../../server/hotels";
 import { createNetworkContext } from "../../server/network";
 import { AiInvalidRequestError } from "../../server/ai/errors";
 import {
-  ALL_HOTEL_IDS,
   bookStay,
   clearEmulator,
   GUEST,
@@ -35,7 +34,7 @@ import {
 
 type Result = Record<string, unknown>;
 
-async function context(overrides: Partial<ToolContext> = {}, scopedPublicId?: string): Promise<ToolContext> {
+async function context(overrides: Partial<ToolContext> = {}, scopedPublicId = KABALE.publicId): Promise<ToolContext> {
   return {
     network: await createNetworkContext(scopedPublicId),
     guestMessage: "",
@@ -77,107 +76,6 @@ describe("resolveHotel", () => {
 
   it("rejects a public id with no hotel behind it", async () => {
     await expect(resolveHotel("no-such-hotel-00000000")).rejects.toBeInstanceOf(AiInvalidRequestError);
-  });
-});
-
-describe("search_hotels", () => {
-  it("finds a double in Western Uganda across hotels, from live availability and rates", async () => {
-    const result = await run("search_hotels", { destination: "Western Uganda", roomType: "Double", ...STAY });
-
-    expect(result).toMatchObject({ status: "ok", nights: 5, hotelsSearched: 2, requestedRoomTypeAvailable: true });
-    expect(result.options).toEqual([
-      {
-        optionNumber: 1,
-        hotel: KABALE.publicId,
-        hotelName: "K Hotels Kabale",
-        city: "Kabale",
-        region: "Western",
-        roomType: "Double",
-        capacity: 2,
-        // 201 is booked 12–14 Oct and 203 is in maintenance: only 202 is free.
-        availableRooms: 1,
-        nightlyRate: 180000,
-        nights: 5,
-        stayTotal: 900000,
-        currency: "UGX",
-        amenities: ["Free Wi-Fi", "Breakfast included", "Free parking"],
-        matchesRequestedRoomType: true,
-      },
-      expect.objectContaining({
-        optionNumber: 2,
-        hotel: MBARARA.publicId,
-        // Its plain Double is booked all week; the Deluxe Double is the double it has.
-        roomType: "Deluxe Double",
-        availableRooms: 1,
-        nightlyRate: 210000,
-        stayTotal: 1050000,
-      }),
-    ]);
-  });
-
-  it("never offers an unlisted hotel, a hotel with a broken mapping, or another region", async () => {
-    const json = JSON.stringify(await run("search_hotels", { destination: "Western Uganda", ...STAY }));
-    expect(json).not.toMatch(/Hidden Lodge|Broken Inn|Kampala/);
-    for (const hotelId of ALL_HOTEL_IDS) expect(json).not.toContain(hotelId);
-  });
-
-  it("searches every listed hotel when no destination is given", async () => {
-    const result = await run("search_hotels", { roomType: "Double", ...STAY });
-    const hotels = (result.options as Result[]).map((option) => option.hotelName);
-    expect(new Set(hotels)).toEqual(new Set(["K Hotels Kabale", "K Hotels Mbarara", "K Hotels Kampala"]));
-  });
-
-  it("only offers rooms recorded as big enough for the party", async () => {
-    const result = await run("search_hotels", { destination: "Kabale", guests: 3, ...STAY });
-    expect((result.options as Result[]).map((option) => [option.roomType, option.capacity])).toEqual([["Family", 4]]);
-  });
-
-  it("offers at most two options per hotel and five in all", async () => {
-    const db = adminDb();
-    for (const [number, type] of [["601", "Twin"], ["602", "Triple"], ["603", "Studio"]]) {
-      await db.doc(`hotels/${KAMPALA.hotelId}/rooms/room-${number}`).set({ number, type, price: 100000, status: "Available", hotelId: KAMPALA.hotelId });
-    }
-    const options = (await run("search_hotels", STAY)).options as Result[];
-    expect(options.length).toBeLessThanOrEqual(5);
-    const perHotel = options.reduce<Record<string, number>>((counts, option) => {
-      counts[String(option.hotel)] = (counts[String(option.hotel)] ?? 0) + 1;
-      return counts;
-    }, {});
-    expect(Math.max(...Object.values(perHotel))).toBeLessThanOrEqual(2);
-  });
-
-  it("says so, and offers other room types, when the requested type isn't free anywhere", async () => {
-    // Kabale's suite has no rate set, so it can't be booked through the concierge.
-    const result = await run("search_hotels", { destination: "Kabale", roomType: "Suite", ...STAY });
-    expect(result).toMatchObject({ status: "ok", requestedRoomTypeAvailable: false });
-    expect((result.options as Result[]).every((option) => option.matchesRequestedRoomType === false)).toBe(true);
-    expect(JSON.stringify(result.options)).not.toContain("Suite");
-  });
-
-  it("names the destinations it serves when none match", async () => {
-    const result = await run("search_hotels", { destination: "Gulu", ...STAY });
-    expect(result).toMatchObject({ status: "no_hotels_in_destination" });
-    expect(result.destinationsServed).toEqual(
-      expect.arrayContaining(["Kabale (Western Region, Uganda)", "Kampala (Central Region, Uganda)"])
-    );
-    expect(JSON.stringify(result)).not.toMatch(/Hoima|Hidden/);
-  });
-
-  it("reports no availability when everything matching is taken", async () => {
-    await bookStay(adminDb(), KAMPALA.hotelId, "502", "2031-10-01", "2031-10-30");
-    const result = await run("search_hotels", { destination: "Kampala", ...STAY });
-    expect(result).toMatchObject({ status: "no_availability", hotelsSearched: 1 });
-    expect(result).not.toHaveProperty("options");
-  });
-
-  it.each([
-    [{ checkIn: "2031-10-15", checkOut: "2031-10-10" }],
-    [{ checkIn: "2031-02-30", checkOut: "2031-03-02" }],
-    [{ checkIn: "2020-01-01", checkOut: "2020-01-03" }],
-    [{ checkIn: "next friday", checkOut: "2031-03-02" }],
-    [{ checkIn: "2031-03-01", checkOut: "2031-06-01" }],
-  ])("rejects invalid or past dates %o", async (dates) => {
-    expect(await run("search_hotels", dates)).toMatchObject({ error: "invalid_dates" });
   });
 });
 
@@ -430,9 +328,8 @@ describe("the toolbox", () => {
     expect(await run("drop_database", {})).toMatchObject({ error: "unknown_tool" });
   });
 
-  it("offers exactly the six concierge tools, none of which takes a hotelId", () => {
+  it("offers exactly the five concierge tools, none of which takes a hotelId", () => {
     expect(CONCIERGE_TOOLS.map((tool) => tool.definition.name)).toEqual([
-      "search_hotels",
       "check_availability",
       "get_hotel_info",
       "calculate_stay_price",
@@ -458,8 +355,6 @@ describe("unreachable hotels", () => {
 
   it("a hotel's own concierge reaches that hotel only", async () => {
     const scoped = await context({}, KABALE.publicId);
-    const search = await run("search_hotels", STAY, scoped);
-    expect(new Set((search.options as Result[]).map((o) => o.hotel))).toEqual(new Set([KABALE.publicId]));
     expect(await run("get_hotel_info", { hotel: MBARARA.publicId }, scoped)).toMatchObject({ error: "unknown_hotel" });
   });
 

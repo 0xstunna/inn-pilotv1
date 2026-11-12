@@ -23,6 +23,7 @@ export type AuditEntity =
   | "parking"
   | "expense"
   | "conversation"
+  | "guestRequest"
   | "settings";
 
 export interface AuditEntry {

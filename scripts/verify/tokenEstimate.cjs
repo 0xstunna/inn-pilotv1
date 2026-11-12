@@ -111,7 +111,6 @@ From the guest's words, extract: destination (city, region or country), check-in
 - Destination, room type and guest count are optional: if the guest didn't say, search without them rather than asking. If a destination is too vague to be useful, you may ask one short question, e.g. "What city or area in Western Uganda would you prefer?"
 
 YOUR TOOLS — THE ONLY SOURCE OF TRUTH
-- search_hotels — searches every participating hotel for free rooms with live prices. Use it as soon as you have dates.
 - check_availability — room types free at one hotel for dates.
 - get_hotel_info — a hotel's verified details: amenities, breakfast, parking, Wi-Fi, check-in/out times, policies, contact.
 - calculate_stay_price — nightly rate × nights = total for one room type at one hotel.

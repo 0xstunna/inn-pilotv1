@@ -229,12 +229,6 @@ try {
       hotel.status === 200 && typeof hotel.body.name === "string" && !JSON.stringify(hotel.body).includes("hotelId"),
       `${hotel.status} ${hotel.body.name ?? ""}`
     );
-    const network = await call("/api/ai/network");
-    check(
-      "the built network endpoint lists participating hotels with no internal id",
-      network.status === 200 && Array.isArray(network.body.hotels) && network.body.hotels.length > 0 && !/KHotels[A-Za-z]+\d+/.test(JSON.stringify(network.body)),
-      `${network.status} ${network.body.hotels?.length ?? 0} hotels`
-    );
   } else {
     console.log("SKIP  hotel lookup: set FIRESTORE_EMULATOR_HOST (and seed) to check it end to end");
   }

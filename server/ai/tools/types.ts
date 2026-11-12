@@ -40,8 +40,8 @@ export async function readHotelArg(context: ToolContext, args: Record<string, un
     result: {
       error: "unknown_hotel",
       message:
-        "That hotel isn't one you can use. Use the exact `hotel` value or hotel name from a search_hotels result; " +
-        "if you don't have either, search again.",
+        "That hotel isn't one you can use. Use the exact `hotel` value or hotel name from this hotel's concierge; " +
+        "if you don't have either, ask again.",
     },
   };
 }

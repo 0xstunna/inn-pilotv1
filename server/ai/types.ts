@@ -9,6 +9,12 @@
  * describable as plain JSON — no Dates, no class instances.
  */
 
+import type {
+  GuestRequestCategory,
+  GuestRequestPriority,
+  GuestRequestType,
+} from "../../src/lib/guestRequest.js";
+
 /** A turn in a conversation. "model" is Gemini's word; ours is "assistant". */
 export type AiRole = "user" | "assistant";
 
@@ -101,10 +107,10 @@ export interface GenerateInput {
 /**
  * A guest's turn, as the gateway receives it.
  *
- * With no `publicHotelId` the turn belongs to the network concierge and may
- * reach every listed hotel. With one — the hotel's own concierge link — it
- * reaches that hotel only (DECISIONS D25). It is always a public id, never a
- * workspace hotelId, and it arrives from an untrusted client.
+ * Every conversation belongs to exactly one hotel. `publicHotelId` is the
+ * hotel's own concierge link; it reaches that hotel only (DECISIONS D32).
+ * It is always a public id, never a workspace hotelId, and it arrives from
+ * an untrusted client.
  */
 export interface ConciergeRequest {
   message: string;
@@ -120,8 +126,7 @@ export interface ConciergeRequest {
 /** A nightly rate (or capacity) across several rooms; null when none is recorded. */
 export type RateRange = { from: number; to: number } | null;
 
-/**
- * One bookable choice from search_hotels: a room type at a hotel, priced
+/** One bookable choice from availability: a room type at a hotel, priced
  * from its cheapest free room for the stay. `hotel` is the public id.
  */
 export interface ConciergeOption {
@@ -141,18 +146,6 @@ export interface ConciergeOption {
   amenities: string[];
   /** False when the guest asked for another room type and none was free. */
   matchesRequestedRoomType: boolean;
-}
-
-/** What search_hotels found this turn, for the page's result cards. */
-export interface ConciergeSearch {
-  destination: string;
-  checkIn: string;
-  checkOut: string;
-  nights: number;
-  roomType: string;
-  guests: number | null;
-  hotelsSearched: number;
-  options: ConciergeOption[];
 }
 
 /** Room types free at one hotel for a stay, as check_availability found them. */
@@ -201,6 +194,21 @@ export interface PendingBooking extends ConciergeQuote {
   preparedAt: number;
 }
 
+/**
+ * What the log_guest_request tool returned this turn, allow-listed to the
+ * guest so the page can show an acknowledgement with the reference number.
+ */
+export interface GuestRequestAck {
+  id: string;
+  reference: string;
+  type: GuestRequestType;
+  category: GuestRequestCategory;
+  priority: GuestRequestPriority;
+  department: string;
+  duplicate: boolean;
+  message: string;
+}
+
 /** A reservation create_reservation confirmed this turn. */
 export interface ConciergeBooking {
   reservationId: string;
@@ -232,10 +240,11 @@ export interface ConciergeReply {
    * the hotels' systems produced rather than parsing the model's prose.
    * Each is absent when its tool didn't run (or didn't succeed) this turn.
    */
-  search?: ConciergeSearch;
   availability?: ConciergeAvailability;
   quote?: ConciergeQuote;
   booking?: ConciergeBooking;
+  /** Logged guest request/complaint, when the turn recorded one. */
+  guestRequest?: GuestRequestAck;
   /** The guest's thread; send it back with the next message. */
   conversationId?: string;
   /** "human" when staff have taken the conversation over and the AI is not replying. */
@@ -257,23 +266,6 @@ export interface ConciergeHotel {
   currency: string;
   amenities: string[];
   roomTypes: { roomType: string; roomCount: number; nightlyRate: RateRange; capacity: RateRange }[];
-}
-
-/** GET /api/ai/network: the participating hotels, for the home page. */
-export interface NetworkHotel {
-  hotel: string;
-  name: string;
-  city: string;
-  region: string;
-  country: string;
-  description: string;
-  currency: string;
-  lowestRate: number | null;
-  amenities: string[];
-}
-
-export interface ConciergeNetwork {
-  hotels: NetworkHotel[];
 }
 
 /**

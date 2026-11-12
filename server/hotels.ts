@@ -19,8 +19,6 @@
  * guest-facing error, so the endpoint can't be used to probe which ids exist.
  *
  * Two server-internal ways in, never reachable from a request:
- *   - listNetworkHotels(): every hotel that opted in to the network
- *     concierge (DECISIONS D24), for search.
  *   - scopeForHotelId(): a hotel the server already knows by its internal id
  *     (a conversation's attached hotels, D29).
  */
@@ -40,9 +38,6 @@ import { AiInvalidRequestError } from "./ai/errors.js";
 
 /** Firestore document ids: no slashes, no traversal, nothing exotic. */
 const HOTEL_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-
-/** More than any real network; a guard against an unbounded read. */
-const MAX_NETWORK_HOTELS = 200;
 
 export type HotelCollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -126,22 +121,4 @@ export async function scopeForHotelId(hotelId: string): Promise<HotelScope | nul
   if (!HOTEL_ID_PATTERN.test(hotelId)) return null;
   const snap = await adminDb().collection("hotels").doc(hotelId).get();
   return snap.exists ? buildScope(hotelId, snap) : null;
-}
-
-/**
- * Every hotel in the network concierge: opted in, and reachable by a public
- * id whose mapping points back at it. A hotel with a broken or missing
- * mapping is left out rather than exposed under an id guests can't use.
- */
-export async function listNetworkHotels(): Promise<HotelScope[]> {
-  const db = adminDb();
-  const snap = await db.collection("hotels").where("listed", "==", true).limit(MAX_NETWORK_HOTELS).get();
-  const candidates = snap.docs.filter((doc) => isPublicHotelId(doc.data().publicId));
-  const mappings = candidates.length
-    ? await db.getAll(...candidates.map((doc) => db.collection(PUBLIC_HOTELS_COLLECTION).doc(doc.data().publicId)))
-    : [];
-  return candidates
-    .filter((doc, index) => mappings[index]?.exists && mappings[index].data()?.hotelId === doc.id)
-    .map((doc) => buildScope(doc.id, doc))
-    .sort((a, b) => a.profile.name.localeCompare(b.profile.name));
 }

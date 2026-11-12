@@ -4,9 +4,10 @@
  * off, and add the sample threads for the MOCKED channels.
  *
  * Writes go through firestore.rules like every other module. A staff reply
- * on WhatsApp, Instagram or Email is recorded in the thread only: those
- * channels have no real integration in this build. On the web channel the
- * guest's concierge page picks the reply up.
+ * or follow-up on WhatsApp is delivered through the WhatsApp adapter (Meta
+ * Cloud API) when credentials are configured; Instagram and Email are
+ * recorded in the thread only. On the web channel the guest's concierge page
+ * picks the reply up.
  */
 import { useEffect, useState } from "react";
 import {
@@ -232,7 +233,21 @@ export async function sendStaffReply(hotelId: string, conversation: Conversation
   const body = text.trim();
   if (!body) return fail("Write a reply first.");
   if (body.length > MAX_MESSAGE_TEXT) return fail(`Keep replies under ${MAX_MESSAGE_TEXT} characters.`);
-  return writeStaffMessage(hotelId, conversation, body, { handledBy: "human" }, "Couldn't send the reply. Please try again.");
+
+  const result = await writeStaffMessage(hotelId, conversation, body, { handledBy: "human" }, "Couldn't send the reply. Please try again.");
+  if (!result.ok) return result;
+
+  // Deliver via WhatsApp when this is a WhatsApp conversation.
+  if (conversation.channel === "whatsapp") {
+    const delivery = await sendWhatsAppMessage(hotelId, conversation, body);
+    if (!delivery.ok) {
+      // The message is recorded in Firestore but not delivered to WhatsApp.
+      // Do not report it as delivered when Meta rejects it.
+      return fail(`Delivered to Firestore but not to WhatsApp: ${delivery.error}`);
+    }
+    logAction(hotelId, "Reply sent via WhatsApp", "conversation", conversation.id, conversation.guestName);
+  }
+  return ok(null);
 }
 
 /**
@@ -255,8 +270,49 @@ export async function sendFollowUp(hotelId: string, conversation: Conversation, 
     { followUpSentAt: serverTimestamp(), followUpSnoozedUntil: null },
     "Couldn't send the follow-up. Please try again."
   );
+  if (!result.ok) return result;
+
+  // Deliver via WhatsApp when this is a WhatsApp conversation.
+  if (conversation.channel === "whatsapp") {
+    const delivery = await sendWhatsAppMessage(hotelId, conversation, body);
+    if (!delivery.ok) {
+      return fail(`Delivered to Firestore but not to WhatsApp: ${delivery.error}`);
+    }
+    logAction(hotelId, "Follow-up sent via WhatsApp", "conversation", conversation.id, conversation.guestName);
+  }
+
   if (result.ok) logAction(hotelId, "Follow-up sent", "conversation", conversation.id, conversation.guestName);
   return result;
+}
+
+/**
+ * Sends a message to a WhatsApp guest via the server send endpoint.
+ * Returns ok:false when Meta rejects the message.
+ */
+async function sendWhatsAppMessage(
+  hotelId: string,
+  conversation: Conversation,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const response = await fetch("/api/ai/whatsapp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hotelId,
+        conversationId: conversation.id,
+        guestContact: conversation.guestContact,
+        text,
+      }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.delivered) {
+      return { ok: false, error: typeof result.error === "string" ? result.error : "WhatsApp delivery failed." };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "WhatsApp send failed." };
+  }
 }
 
 /** "Not now": keeps a conversation off the follow-up list for a day, without touching the thread. */

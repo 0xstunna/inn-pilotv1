@@ -22,7 +22,7 @@ export const availabilityTool: ConciergeTool = {
     parameters: {
       type: "object",
       properties: {
-        hotel: { type: "string", description: "The hotel's `hotel` id from a search_hotels result, or its exact hotel name." },
+        hotel: { type: "string", description: "The hotel's `hotel` value from this concierge, or its exact hotel name." },
         checkIn: { type: "string", description: "Arrival date, YYYY-MM-DD." },
         checkOut: { type: "string", description: "Departure date, YYYY-MM-DD. Must be after checkIn." },
         guests: { type: "integer", description: "Optional. Number of guests staying." },
@@ -66,7 +66,7 @@ export const availabilityTool: ConciergeTool = {
         "This is a snapshot taken just now. Never promise a room is held — only create_reservation books one.",
         "capacity null means it isn't recorded: don't claim the room fits the party.",
         offers.length === 0
-          ? "Nothing matching is free here for those dates. Say so and offer other dates, or search_hotels for other hotels."
+          ? "Nothing matching is free here for those dates. Say so and offer other dates."
           : "Quote only these figures.",
       ],
     };

@@ -1,15 +1,15 @@
 /**
- * GET /api/ai/conversation?conversationId=…&after=<ms>
+ * GET /api/ai/conversation?conversationId=…&after=<ms>&publicHotelId=…
  *
  * The guest's page polls this for replies from hotel staff: every few seconds
  * while staff handle the chat, now and then while the AI does. It returns
- * staff messages newer than `after` from every hotel inbox the thread is
- * mirrored into (DECISIONS D29), and whether staff are handling it.
+ * staff messages newer than `after` from this hotel's inbox mirror, and
+ * whether staff are handling it.
  *
  * The id is a 20-character auto-id only that guest's tab holds; it grants
  * nothing but reading staff replies in that one thread. No model call, no
  * hotelId in the response. A thread started on a hotel's own link is only
- * readable with that hotel's `publicHotelId`; a network thread, without one.
+ * readable with that hotel's `publicHotelId`.
  */
 import { enforceRateLimit } from "../../server/ai/rateLimit.js";
 import { readGuestThreadUpdates } from "../../server/guestConversations.js";

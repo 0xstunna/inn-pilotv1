@@ -10,19 +10,19 @@ import { errorMessage } from "../errors.js";
 import type { AiToolDefinition, AiToolExecutor } from "../types.js";
 import { availabilityTool } from "./availability.js";
 import { createReservationTool } from "./createReservation.js";
+import { guestRequestTool } from "./guestRequest.js";
 import { hotelInfoTool } from "./hotelInfo.js";
 import { prepareBookingTool } from "./prepareBooking.js";
 import { stayPriceTool } from "./price.js";
-import { searchHotelsTool } from "./search.js";
 import type { ConciergeTool, ToolContext } from "./types.js";
 
 export const CONCIERGE_TOOLS: readonly ConciergeTool[] = [
-  searchHotelsTool,
   availabilityTool,
   hotelInfoTool,
   stayPriceTool,
   prepareBookingTool,
   createReservationTool,
+  guestRequestTool,
 ];
 
 export interface Toolbox {

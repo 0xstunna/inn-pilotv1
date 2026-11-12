@@ -28,6 +28,8 @@ export interface HotelListing {
   checkInTime: string;
   checkOutTime: string;
   policies: string;
+  /** The Meta WhatsApp phone number ID this hotel receives messages on, for webhook routing. */
+  whatsappPhoneNumberId?: string;
 }
 
 const text = (value: unknown, max = 200): string => (typeof value === "string" ? value.trim().slice(0, max) : "");
@@ -62,6 +64,9 @@ export function toHotelListing(data: Record<string, unknown>): HotelListing {
     checkInTime: text(data.checkInTime, 20),
     checkOutTime: text(data.checkOutTime, 20),
     policies: text(data.policies, MAX_POLICIES_LENGTH),
+    ...(typeof data.whatsappPhoneNumberId === "string" && data.whatsappPhoneNumberId.trim()
+      ? { whatsappPhoneNumberId: data.whatsappPhoneNumberId.trim() }
+      : {}),
   };
 }
 

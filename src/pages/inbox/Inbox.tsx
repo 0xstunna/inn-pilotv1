@@ -15,10 +15,11 @@
  * went quiet.
  */
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Archive, ArchiveRestore, ArrowLeft, BellRing, Bot, Headset, Inbox as InboxIcon, Info, Search, Send, Sparkles } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, BellRing, Bot, Headset, Inbox as InboxIcon, Info, Search, Send, Sparkles, Ticket } from "lucide-react";
 
 import { useWorkspace } from "../../workspace/workspaceContext";
 import { useHotelProfile } from "../../lib/hotelProfile";
+import { Link } from "react-router-dom";
 import {
   attentionCounts,
   channelCounts,
@@ -46,6 +47,7 @@ import {
 import { draftFollowUp, dueFollowUp, sortFollowUps, type FollowUp } from "../../lib/followUps";
 import { LEAD_EMOJI } from "../../lib/leadScoring";
 import { dateTime, money } from "../../lib/format";
+import { useGuestRequests } from "../../lib/guestRequests";
 import {
   addSampleConversations,
   addInternalNote,
@@ -80,6 +82,9 @@ export default function Inbox() {
   const { profile } = useHotelProfile(hotelId);
   const toast = useToast();
   const { conversations, loading, error } = useConversations(hotelId);
+  const { requests: guestRequests } = useGuestRequests(hotelId);
+
+  const newRequestCount = useMemo(() => guestRequests.filter((r) => r.status === "new").length, [guestRequests]);
 
   const [channel, setChannel] = useState<ChannelFilter>("all");
   const [lead, setLead] = useState<LeadFilter>("all");
@@ -209,11 +214,22 @@ export default function Inbox() {
         title="Inbox"
         subtitle="Guest conversations from the AI Concierge and every channel. Take over any time."
         actions={
-          !hasSamples && conversations.length > 0 ? (
-            <button type="button" className="btn btn-secondary btn-sm" onClick={addSamples} disabled={addingSamples}>
-              <Sparkles size={14} /> {addingSamples ? "Adding…" : "Add sample conversations"}
-            </button>
-          ) : undefined
+          <>
+            {newRequestCount > 0 && (
+              <Link
+                to="/dashboard/requests"
+                className="btn btn-secondary btn-sm"
+                title={`${newRequestCount} new guest request${newRequestCount === 1 ? "" : "s"} awaiting acknowledgement`}
+              >
+                <Ticket size={14} /> Requests <span className="badge badge-danger">{newRequestCount}</span>
+              </Link>
+            )}
+            {!hasSamples && conversations.length > 0 && (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addSamples} disabled={addingSamples}>
+                <Sparkles size={14} /> {addingSamples ? "Adding…" : "Add sample conversations"}
+              </button>
+            )}
+          </>
         }
       />
 

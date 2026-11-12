@@ -119,7 +119,7 @@ export interface TurnRecord {
   /** Whether the guest has chosen this hotel, another one, or none yet. */
   selection?: HotelSelection;
   selectedHotelName?: string;
-  /** The guest booked at another hotel in the network. */
+  /** The guest booked at another hotel (legacy network-era field, always false now). */
   bookedElsewhere?: boolean;
   /** Who the guest said they are, before any booking (from a booking summary). */
   guest?: { name: string; phone: string };

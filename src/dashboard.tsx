@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import {
   BedDouble,
   Check,
+  ClipboardList,
   Copy,
   LayoutDashboard,
   Menu,
@@ -38,6 +39,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { icon: <LayoutDashboard size={19} />, label: "Dashboard", to: "/dashboard", end: true },
   { icon: <MessagesSquare size={19} />, label: "Inbox", to: "/dashboard/inbox" },
+  { icon: <ClipboardList size={19} />, label: "Requests", to: "/dashboard/requests" },
   { icon: <BedDouble size={19} />, label: "Rooms", to: "/dashboard/accommodation" },
   { icon: <Settings size={19} />, label: "Settings", to: "/dashboard/settings" },
 ];
@@ -49,6 +51,7 @@ const NAV: NavItem[] = [
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "/dashboard": { title: "Dashboard", subtitle: "Manage room inventory, guest inquiries and reservations" },
   "/dashboard/inbox": { title: "Inbox", subtitle: "Guest conversations from every channel" },
+  "/dashboard/requests": { title: "Guest requests", subtitle: "Issues and requests guests raised through the concierge" },
   "/dashboard/accommodation": { title: "Rooms", subtitle: "Room inventory, reservations and occupancy" },
   "/dashboard/settings": { title: "Settings", subtitle: "Hotel profile and activity" },
 };

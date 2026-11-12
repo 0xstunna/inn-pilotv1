@@ -21,7 +21,8 @@ import conciergeHandler from "../api/ai/concierge";
 import healthHandler from "../api/ai/health";
 import hotelHandler from "../api/ai/hotel";
 import conversationHandler from "../api/ai/conversation";
-import networkHandler from "../api/ai/network";
+import whatsappWebhookHandler from "../api/ai/webhook/whatsapp";
+import channelsHandler from "../api/ai/channels";
 import type { ApiRequest, ApiResponse } from "./ai/http";
 
 const PORT = Number(process.env.DEV_API_PORT ?? 3001);
@@ -32,7 +33,8 @@ const ROUTES: Record<string, (req: ApiRequest, res: ApiResponse) => Promise<void
   "/api/ai/health": healthHandler,
   "/api/ai/hotel": hotelHandler,
   "/api/ai/conversation": conversationHandler,
-  "/api/ai/network": networkHandler,
+  "/api/ai/webhook/whatsapp": whatsappWebhookHandler,
+  "/api/ai/channels": channelsHandler,
 };
 
 /** Gives a raw Node response the `status().json()` shape handlers expect. */
@@ -81,7 +83,6 @@ server.listen(PORT, () => {
   console.log(`\n  InnPilot dev API`);
   console.log(`  ➜  http://localhost:${PORT}/api/ai/health`);
   console.log(`  ➜  http://localhost:${PORT}/api/ai/concierge  (POST)`);
-  console.log(`  ➜  http://localhost:${PORT}/api/ai/network`);
   console.log(`  ➜  http://localhost:${PORT}/api/ai/hotel?publicHotelId=…`);
   const provider = (process.env.AI_PROVIDER ?? "groq").toLowerCase();
   const keyName = provider === "gemini" ? "GEMINI_API_KEY" : "GROQ_API_KEY";

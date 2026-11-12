@@ -5,7 +5,7 @@
 //   node scripts/verify/fake-gemini.mjs            # listens on :8787
 //   GEMINI_BASE_URL=http://127.0.0.1:8787 npm run dev:api
 //
-// It follows the golden path: dates + "double" → search_hotels; "option N" →
+// It follows the golden path: dates + "double" → check_availability; "option N" →
 // ask for name and phone; a phone number → prepare_booking; a clear yes →
 // create_reservation. Every figure it says comes from the tool results the
 // gateway sends back, exactly as the real model is instructed to do.
@@ -40,7 +40,7 @@ function respond(body) {
 
   if (toolResult) {
     const r = toolResult.response ?? {};
-    if (toolResult.name === "search_hotels") {
+    if (toolResult.name === "check_availability") {
       if (r.status !== "ok") return text(r.guidance ?? r.message ?? "I couldn't find anything for those dates.");
       memory.options = r.options;
       const lines = r.options.map((o) => `${o.optionNumber}. ${o.hotelName} (${o.city}) — ${o.roomType}, ${ugx(o.nightlyRate)}/night, ${o.nights} nights: ${ugx(o.stayTotal)}`);
@@ -67,7 +67,7 @@ function respond(body) {
   if (stay) {
     const destination = /western uganda/i.test(userText) ? "Western Uganda" : "";
     const roomType = /double/i.test(userText) ? "Double" : "";
-    return call("search_hotels", { ...stay, ...(destination ? { destination } : {}), ...(roomType ? { roomType } : {}) });
+    return call("check_availability", { ...stay, ...(destination ? { destination } : {}), ...(roomType ? { roomType } : {}) });
   }
   if (/option \d+/i.test(userText)) {
     return text("Great choice. May I have your full name and phone number?");
@@ -111,10 +111,10 @@ http
       let payload;
       try {
         const body = JSON.parse(raw || "{}");
-        // search_hotels results don't carry dates per option; remember them from the call.
+        // check_availability results don't carry dates per option; remember them from the call.
         for (const content of body.contents ?? []) {
           for (const part of content.parts ?? []) {
-            if (part.functionCall?.name === "search_hotels") {
+            if (part.functionCall?.name === "check_availability") {
               memory.checkIn = part.functionCall.args.checkIn;
               memory.checkOut = part.functionCall.args.checkOut;
             }

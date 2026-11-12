@@ -279,7 +279,37 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      // ---- Guest conversations (the inbox; see src/lib/conversations.ts) ----
+      // Guest requests and complaints (R13/R14; see src/lib/guestRequest.ts).
+    function guestRequestOk() {
+      return incoming().type in ['request', 'complaint', 'feedback']
+        && incoming().category in ['housekeeping', 'maintenance', 'food_beverage', 'front_desk', 'noise', 'billing', 'safety', 'other']
+        && incoming().priority in ['normal', 'high', 'urgent']
+        && incoming().status in ['new', 'acknowledged', 'in_progress', 'resolved', 'closed']
+        && incoming().channel in ['web', 'whatsapp']
+        && (!('conversationId' in incoming()) || incoming().conversationId is string)
+        && optionalText('summary', 500)
+        && optionalText('guestExcerpt', 500)
+        && optionalText('guestName', 120)
+        && optionalText('guestPhone', 40)
+        && optionalText('guestRoom', 20)
+        && optionalText('department', 80)
+        && optionalText('assigneeId', 64)
+        && optionalText('assigneeName', 120)
+        && (!('notes' in incoming())
+          || (incoming().notes is list && incoming().notes.size() <= 50
+            && incoming().notes.all(note, note is map
+              && note.keys().hasOnly(['text', 'at', 'by'])
+              && optionalTextFn(note, 'text') && optionalTextFn(note, 'by')))
+        )
+        && momentOk('createdAt') && momentOk('acknowledgedAt') && momentOk('resolvedAt');
+    }
+
+    // optionalText applied to a nested map field.
+    function optionalTextFn(map, field) {
+      return !(field in map) || (map[field] is string && map[field].size() <= 500);
+    }
+
+    // ---- Guest conversations (the inbox; see src/lib/conversations.ts) ----
       // Web threads are written by the server; the workspace can add sample
       // threads for the MOCKED channels, take a thread over and reply.
       match /conversations/{conversationId} {
@@ -311,6 +341,24 @@ service cloud.firestore {
         allow read: if true;
         allow create: if workspaceWrite(hotelId);
         allow update, delete: if false;
+      }
+
+      // Guest requests and complaints (R13/R14): created by the server via
+      // the log_guest_request tool, updated by staff through the requests
+      // queue. Status transitions are enforced by the app (one shared
+      // function, src/lib/guestRequest.ts); these rules keep the shape sane.
+      match /guestRequests/{requestId} {
+        allow read: if resource.data.hotelId == hotelId;
+        allow create: if workspaceWrite(hotelId) && guestRequestOk()
+          && incoming().hotelId == hotelId;
+        allow update: if workspaceWrite(hotelId)
+          && guestRequestOk()
+          && incoming().hotelId == hotelId
+          && (
+              incoming().status in ['acknowledged', 'in_progress', 'resolved', 'closed']
+              || (resource.data.status == 'new' && incoming().status == 'new')
+            ); // staff move a request forward through its lifecycle; a brand-new record may stay new
+        allow delete: if false;
       }
     }
 

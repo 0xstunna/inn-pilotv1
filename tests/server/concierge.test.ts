@@ -55,7 +55,7 @@ import { adminDb } from "../../server/admin";
 import { resetGeminiClient } from "../../server/ai/gemini";
 import { resetRateLimits } from "../../server/ai/rateLimit";
 import { HUMAN_HOLDING_REPLY } from "../../src/lib/conversations";
-import { ALL_HOTEL_IDS, bookStay, clearEmulator, GUEST, KABALE, KAMPALA, MBARARA, seedNetwork, STAY } from "./fixtures/network";
+import { ALL_HOTEL_IDS, bookStay, clearEmulator, GUEST, KABALE, MBARARA, seedNetwork, STAY } from "./fixtures/network";
 
 /** A model turn that asks for tools, the way the SDK surfaces it. */
 function callTools(...calls: { name: string; args: Record<string, unknown> }[]): ScriptedResponse {
@@ -156,48 +156,33 @@ beforeEach(async () => {
 });
 
 describe("the golden path", () => {
-  it("turns “a double room between 10th and 15th October in Western Uganda” into a confirmed reservation staff can see", async () => {
-    const browser = guest();
+  it("turns “a double room between 10th and 15th October” into a confirmed reservation staff can see", async () => {
+    const browser = guest({ publicHotelId: KABALE.publicId });
 
-    /* 1 — The request: the model extracts intent and searches every hotel. */
+    /* 1 — The request: the model checks this hotel's live availability. */
     gemini.responses = [
-      callTools({ name: "search_hotels", args: { destination: "Western Uganda", roomType: "Double", ...STAY } }),
+      callTools({ name: "check_availability", args: kabaleDouble }),
       (request) => {
-        const [search] = functionResponses(request);
-        const options = search.response.options as { hotelName: string; stayTotal: number }[];
-        return answer(`Here are ${options.length} available options: ${options.map((o) => `${o.hotelName} ${o.stayTotal}`).join("; ")}`);
+        const [result] = functionResponses(request);
+        const roomTypes = result.response.roomTypes as { roomType: string; stayTotal: number }[];
+        return answer(`Here are ${roomTypes.length} available options: ${roomTypes.map((o) => `${o.roomType} ${o.stayTotal}`).join("; ")}`);
       },
     ];
-    const t1 = await browser.say("I need a double room between 10th and 15th October in Western Uganda.");
+    const t1 = await browser.say("I need a double room between 10th and 15th October.");
 
     expect(t1.statusCode).toBe(200);
-    expect(t1.body.reply).toBe("Here are 2 available options: K Hotels Kabale 900000; K Hotels Mbarara 1050000");
-    expect(t1.body.search).toEqual({
-      destination: "Western Uganda",
+    expect(t1.body.reply).toBe("Here are 2 available options: Double 900000; Family 1600000");
+    expect(t1.body.availability).toMatchObject({
+      hotel: KABALE.publicId,
+      hotelName: "K Hotels Kabale",
+      city: "Kabale",
       checkIn: "2031-10-10",
       checkOut: "2031-10-15",
       nights: 5,
-      roomType: "Double",
-      guests: null,
-      hotelsSearched: 2,
-      options: [
-        {
-          optionNumber: 1,
-          hotel: KABALE.publicId,
-          hotelName: "K Hotels Kabale",
-          city: "Kabale",
-          region: "Western",
-          roomType: "Double",
-          capacity: 2,
-          availableRooms: 1,
-          nightlyRate: 180000,
-          nights: 5,
-          stayTotal: 900000,
-          currency: "UGX",
-          amenities: ["Free Wi-Fi", "Breakfast included", "Free parking"],
-          matchesRequestedRoomType: true,
-        },
-        expect.objectContaining({ optionNumber: 2, hotel: MBARARA.publicId, roomType: "Deluxe Double", stayTotal: 1050000 }),
+      totalAvailable: 2,
+      roomTypes: [
+        { roomType: "Double", availableRooms: 1, capacity: 2, nightlyRate: 180000, stayTotal: 900000 },
+        { roomType: "Family", availableRooms: 1, capacity: 4, nightlyRate: 320000, stayTotal: 1600000 },
       ],
     });
     const id = String(browser.conversationId);
@@ -205,9 +190,8 @@ describe("the golden path", () => {
 
     // What the model was given: the concierge's identity and the six tools.
     const first = gemini.requests[0] as { config: { systemInstruction: string; tools: { functionDeclarations: { name: string }[] }[] } };
-    expect(first.config.systemInstruction).toContain("You are InnPilot AI Concierge, a hotel discovery and booking assistant for participating K Hotels properties.");
+    expect(first.config.systemInstruction).toContain("You are InnPilot AI Concierge for K Hotels Kabale.");
     expect(first.config.tools[0].functionDeclarations.map((d) => d.name)).toEqual([
-      "search_hotels",
       "check_availability",
       "get_hotel_info",
       "calculate_stay_price",
@@ -215,15 +199,13 @@ describe("the golden path", () => {
       "create_reservation",
     ]);
 
-    // Both hotels shown now have this guest in their inbox, as a quoted lead.
-    expect((await mirror(KABALE.hotelId, id).get()).data()).toMatchObject({ channel: "web", bookingStatus: "quoted", selection: "none", messageCount: 2 });
-    expect((await mirror(MBARARA.hotelId, id).get()).data()).toMatchObject({ bookingStatus: "quoted" });
-    expect((await mirror(KAMPALA.hotelId, id).get()).exists).toBe(false);
+    // This hotel's inbox has this guest as a quoted lead.
+    expect((await mirror(KABALE.hotelId, id).get()).data()).toMatchObject({ channel: "web", bookingStatus: "quoted", selection: "this", messageCount: 2 });
 
     /* 2 — The choice: only the necessary details are asked for. */
     gemini.responses = [answer("Great choice. May I have your full name and phone number?")];
     const t2 = await browser.say("I'll take the first one.");
-    expect(t2.body).not.toHaveProperty("search");
+    expect(t2.body).not.toHaveProperty("availability");
 
     /* 3 — The details: availability and price re-checked, summary shown, nothing booked. */
     gemini.responses = [
@@ -250,7 +232,6 @@ describe("the golden path", () => {
     expect(t3.body).not.toHaveProperty("booking");
     expect(await bookingsBy(KABALE.hotelId)).toHaveLength(0);
     expect((await mirror(KABALE.hotelId, id).get()).data()).toMatchObject({ selection: "this", guestName: "Amina Okello" });
-    expect((await mirror(MBARARA.hotelId, id).get()).data()).toMatchObject({ selection: "other", selectedHotelName: "K Hotels Kabale" });
 
     /* 4 — Confirm: re-checked inside the transaction, booked, real reference. */
     gemini.responses = [
@@ -300,12 +281,6 @@ describe("the golden path", () => {
       messageCount: 8,
       // Booked, and five nights is a long stay (D20).
       lead: { score: "vip" },
-    });
-    expect((await mirror(MBARARA.hotelId, id).get()).data()).toMatchObject({ bookingStatus: "quoted", bookedElsewhere: true });
-    expect((await canonical(id).get()).data()).toMatchObject({
-      reservation: { hotelId: KABALE.hotelId, reservationId: booking.reservationId },
-      pendingBooking: null,
-      messageCount: 8,
     });
 
     // The workspace key never reached the guest or the model at any point.
@@ -376,7 +351,7 @@ describe("booking safety", () => {
 describe("human handoff", () => {
   it("staff at one hotel take over: the AI stops, the guest is told, and staff replies reach the guest page", async () => {
     const browser = guest();
-    gemini.responses = [callTools({ name: "search_hotels", args: { destination: "Western Uganda", ...STAY } }), answer("Here are some options.")];
+    gemini.responses = [callTools({ name: "check_availability", args: kabaleDouble }), answer("Here are some options.")];
     await browser.say("Rooms in Western Uganda 10-15 Oct 2031?");
     const id = String(browser.conversationId);
 
@@ -404,14 +379,14 @@ describe("human handoff", () => {
     expect(await browser.say("And breakfast?")).toMatchObject({ body: { handledBy: "ai" } });
   });
 
-  it("a network thread can't be polled through a hotel's own link, or continued there", async () => {
-    const browser = guest();
+  it("a scoped thread can't be continued through another hotel's link", async () => {
+    const browser = guest(KABALE.publicId);
     gemini.responses = [answer("Hello!"), answer("Hi from Kabale")];
     await browser.say("Hi");
     const id = String(browser.conversationId);
 
-    expect((await poll(`conversationId=${id}&publicHotelId=${KABALE.publicId}`)).statusCode).toBe(400);
-    const scoped = await post({ message: "Hi", publicHotelId: KABALE.publicId, conversationId: id });
+    // Mbarara's link can't continue this thread.
+    const scoped = await post({ message: "Hi", publicHotelId: MBARARA.publicId, conversationId: id });
     expect(scoped.body.conversationId).not.toBe(id);
   });
 });
@@ -419,28 +394,28 @@ describe("human handoff", () => {
 describe("the gateway", () => {
   it("answers without tools when none are needed, with no cards", async () => {
     gemini.responses = [answer("Hello! Where and when would you like to stay?")];
-    const res = await post({ message: "Hi" });
+    const res = await post({ message: "Hi", publicHotelId: KABALE.publicId });
     expect(res.statusCode).toBe(200);
     expect(res.body.reply).toBe("Hello! Where and when would you like to stay?");
     for (const card of ["search", "availability", "quote", "booking"]) expect(res.body).not.toHaveProperty(card);
-    // The thread is recorded, but no hotel's inbox has this guest yet (D29).
-    expect((await canonical(String(res.body.conversationId)).get()).data()).toMatchObject({ messageCount: 2, hotelIds: [] });
+    // The thread is recorded in the one hotel's inbox.
+    expect((await mirror(KABALE.hotelId, String(res.body.conversationId)).get()).data()).toMatchObject({ messageCount: 2 });
   });
 
-  it("puts a guest a search found nothing for in no inbox, and says where hotels are", async () => {
+  it("puts a guest who checks availability and finds nothing in the one hotel's inbox", async () => {
     gemini.responses = [
-      callTools({ name: "search_hotels", args: { destination: "Gulu", ...STAY } }),
-      (request) => answer(`We have hotels in: ${(functionResponses(request)[0].response.destinationsServed as string[]).join(", ")}`),
+      callTools({ name: "check_availability", args: kabaleDouble }),
+      (request) => answer("Nothing is free for those dates."),
     ];
-    const res = await post({ message: "A room in Gulu 10-15 Oct 2031" });
-    expect(res.body.reply).toContain("Kabale (Western Region, Uganda)");
-    expect(res.body).not.toHaveProperty("search");
+    const res = await post({ message: "A room 10-15 Oct 2031", publicHotelId: KABALE.publicId });
+    expect(res.body.reply).toContain("Nothing is free for those dates.");
+    expect(res.body).not.toHaveProperty("availability");
   });
 
   it("stops a model that keeps calling tools, with a guest-safe error", async () => {
     gemini.responses = Array.from({ length: 10 }, () => callTools({ name: "get_hotel_info", args: { hotel: KABALE.publicId } }));
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const res = await post({ message: "Tell me about Kabale" });
+    const res = await post({ message: "Tell me about Kabale", publicHotelId: KABALE.publicId });
     error.mockRestore();
     expect(res.statusCode).toBe(503);
     expect(res.body.code).toBe("unavailable");
@@ -451,7 +426,7 @@ describe("the gateway", () => {
   it("gives a guest-safe error when Gemini fails, and still records the guest", async () => {
     gemini.responses = ["fail", "fail"];
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const res = await post({ message: "Any rooms?" });
+    const res = await post({ message: "Any rooms?", publicHotelId: KABALE.publicId });
     error.mockRestore();
     expect(res.statusCode).toBe(503);
     expect(String(res.body.error)).not.toMatch(/upstream|exploded|500/);
@@ -468,10 +443,22 @@ describe("the gateway", () => {
     expect(gemini.requests).toHaveLength(0);
   });
 
+  it("refuses a missing publicHotelId before any model call", async () => {
+    const res = await post({ message: "Any rooms?" });
+    expect(res.statusCode).toBe(400);
+    expect(gemini.requests).toHaveLength(0);
+  });
+
+  it("refuses an unknown valid-format publicHotelId before any model call", async () => {
+    const res = await post({ message: "Any rooms?", publicHotelId: "no-such-hotel-abc123" });
+    expect(res.statusCode).toBe(400);
+    expect(gemini.requests).toHaveLength(0);
+  });
+
   it("logs where a turn's time went: resolution, each model call and each tool", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
-    gemini.responses = [callTools({ name: "search_hotels", args: STAY }), answer("Here are some options.")];
-    await post({ message: "Rooms 10-15 Oct 2031?" });
+    gemini.responses = [callTools({ name: "check_availability", args: STAY }), answer("Here are some options.")];
+    await post({ message: "Rooms 10-15 Oct 2031?", publicHotelId: KABALE.publicId });
     const ok = info.mock.calls.find((call) => call[0] === "[concierge] ok")?.[1] as { timing: Record<string, unknown> };
     info.mockRestore();
     expect(ok.timing).toMatchObject({
@@ -481,7 +468,7 @@ describe("the gateway", () => {
         { toolCallsRequested: 1, inputTokens: 100, outputTokens: 10 },
         { finishReason: "STOP", toolCallsRequested: 0 },
       ],
-      toolCalls: [{ name: "search_hotels", ms: expect.any(Number) }],
+      toolCalls: [{ name: "check_availability", ms: expect.any(Number) }],
     });
   });
 
@@ -496,7 +483,7 @@ describe("the gateway", () => {
     it("gives the guest a safe 504 and keeps their conversation", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       gemini.responses = ["hang"];
-      const res = await post({ message: "Where are you?" });
+      const res = await post({ message: "Where are you?", publicHotelId: KABALE.publicId });
       error.mockRestore();
       expect(res.statusCode).toBe(504);
       expect(res.body).toEqual({

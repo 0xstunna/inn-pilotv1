@@ -48,7 +48,7 @@ import handler from "../../api/ai/concierge";
 import { adminDb } from "../../server/admin";
 import { resetGroqClient } from "../../server/ai/groq";
 import { resetRateLimits } from "../../server/ai/rateLimit";
-import { ALL_HOTEL_IDS, clearEmulator, GUEST, KABALE, MBARARA, seedNetwork, STAY } from "./fixtures/network";
+import { ALL_HOTEL_IDS, clearEmulator, GUEST, KABALE, seedNetwork, STAY } from "./fixtures/network";
 
 let callNumber = 0;
 /** A Groq completion asking for tools. */
@@ -132,37 +132,38 @@ beforeEach(async () => {
 });
 
 describe("the golden path on Groq", () => {
-  it("search → select → guest details → summary → confirm → a real reservation", async () => {
+  it("check availability → select → guest details → summary → confirm → a real reservation", async () => {
     const browser = guest();
 
-    /* 1 — search: the model's arguments reach the real search tool; figures come back from Firestore. */
+    /* 1 — check availability: the model's arguments reach the real tool; figures come back from Firestore. */
     groq.script = [
-      callTools({ name: "search_hotels", args: { destination: "Western Uganda", roomType: "Double", ...STAY } }),
+      callTools({ name: "check_availability", args: kabaleDouble }),
       (body) => {
-        const [search] = toolResults(body);
-        const options = search.options as { hotelName: string; nightlyRate: number; nights: number; stayTotal: number }[];
-        return answer(options.map((o, i) => `${i + 1}. ${o.hotelName} ${o.nightlyRate}×${o.nights}=${o.stayTotal}`).join("\n"));
+        const [result] = toolResults(body);
+        const roomTypes = result.roomTypes as { roomType: string; nightlyRate: number; nights: number; stayTotal: number }[];
+        return answer(roomTypes.map((o, i) => `${i + 1}. ${o.roomType} ${o.nightlyRate}×${o.nights}=${o.stayTotal}`).join("\n"));
       },
     ];
     const t1 = await browser.say("I need a double room between 10th and 15th October in Western Uganda.");
     expect(t1.statusCode).toBe(200);
-    expect(t1.body.reply).toBe("1. K Hotels Kabale 180000×5=900000\n2. K Hotels Mbarara 210000×5=1050000");
-    expect(t1.body.search).toMatchObject({
+    expect(t1.body.reply).toBe("1. Double 180000×5=900000\n2. Family 320000×5=1600000");
+    expect(t1.body.availability).toMatchObject({
+      hotel: KABALE.publicId,
       checkIn: "2031-10-10",
       checkOut: "2031-10-15",
       nights: 5,
-      options: [
-        expect.objectContaining({ hotel: KABALE.publicId, nightlyRate: 180000, nights: 5, stayTotal: 900000 }),
-        expect.objectContaining({ hotel: MBARARA.publicId, nightlyRate: 210000, stayTotal: 1050000 }),
+      totalAvailable: 2,
+      roomTypes: [
+        expect.objectContaining({ roomType: "Double", nightlyRate: 180000, nights: 5, stayTotal: 900000 }),
+        expect.objectContaining({ roomType: "Family", nightlyRate: 320000, nights: 5, stayTotal: 1600000 }),
       ],
     });
-    // Groq was sent the concierge prompt and all six tools as functions, on the default model.
+    // Groq was sent the concierge prompt and all five tools as functions, on the default model.
     const first = groq.requests[0] as { model: string; messages: { role: string; content: string }[]; tools: { type: string; function: { name: string } }[] };
     expect(first.model).toBe("openai/gpt-oss-120b");
     expect(first.messages[0].role).toBe("system");
     expect(first.messages[0].content).toContain("You are InnPilot AI Concierge");
     expect(first.tools.map((t) => `${t.type}:${t.function.name}`)).toEqual([
-      "function:search_hotels",
       "function:check_availability",
       "function:get_hotel_info",
       "function:calculate_stay_price",
@@ -277,7 +278,7 @@ describe("provider failures reach the guest as the safe unavailable response", (
   });
 
   it("an invalid model response", async () => {
-    groq.script = [callTools({ name: "search_hotels", args: {} })];
+    groq.script = [callTools({ name: "check_availability", args: {} })];
     (groq.script[0] as { choices: { message: { tool_calls: { function: { arguments: string } }[] } }[] }).choices[0].message.tool_calls[0].function.arguments = "{broken";
     const res = await guest().say("Any rooms in Kabale?");
     expect(res.statusCode).toBe(503);

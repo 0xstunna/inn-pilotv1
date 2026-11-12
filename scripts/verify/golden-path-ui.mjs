@@ -104,7 +104,7 @@ try {
   const t1 = await say(guest, DEMO);
   check("turn 1: gateway answered", t1.status === 200, `HTTP ${t1.status} ${t1.body.code ?? ""}`);
   const options = t1.body.search?.options ?? [];
-  check("turn 1: real options returned from search_hotels", options.length >= 2, options.map((o) => `${o.hotelName} ${o.roomType} ${o.stayTotal}`).join(" | "));
+  check("turn 1: real options returned from check_availability", options.length >= 2, options.map((o) => `${o.hotelName} ${o.roomType} ${o.stayTotal}`).join(" | "));
   check("turn 1: dates understood as 10–15 Oct, 5 nights", t1.body.search?.checkIn?.endsWith("-10-10") && t1.body.search?.checkOut?.endsWith("-10-15") && t1.body.search?.nights === 5);
   check("turn 1: only Western Region hotels", options.length > 0 && options.every((o) => o.region === "Western"));
   check("turn 1: prices = nightly × nights", options.every((o) => o.stayTotal === o.nightlyRate * o.nights));

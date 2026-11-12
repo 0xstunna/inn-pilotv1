@@ -75,7 +75,7 @@ function apiError(status: number, headers: Record<string, string> = {}, body: Re
 }
 
 const tools = [
-  { name: "search_hotels", description: "Search.", parameters: { type: "object", properties: { destination: { type: "string" } } } },
+  { name: "check_availability", description: "Search.", parameters: { type: "object", properties: { destination: { type: "string" } } } },
 ];
 
 function input(overrides: Partial<GenerateInput> = {}): GenerateInput {
@@ -152,7 +152,7 @@ describe("requests", () => {
 describe("the tool loop", () => {
   it("runs each requested tool with parsed arguments and returns the results under the matching call id", async () => {
     sdk.script = [
-      toolCalls({ name: "search_hotels", args: { destination: "Kabale" }, id: "fc_1" }),
+      toolCalls({ name: "check_availability", args: { destination: "Kabale" }, id: "fc_1" }),
       (body) => {
         const messages = body.messages as Record<string, unknown>[];
         return text(`Found: ${messages.at(-1)!.content}`);
@@ -163,22 +163,22 @@ describe("the tool loop", () => {
 
     const result = await generate(input({ tools, executeTool, trace }));
 
-    expect(executeTool).toHaveBeenCalledWith({ name: "search_hotels", args: { destination: "Kabale" } });
+    expect(executeTool).toHaveBeenCalledWith({ name: "check_availability", args: { destination: "Kabale" } });
     expect(sdk.requests[1].messages).toEqual([
       expect.objectContaining({ role: "system" }),
       expect.objectContaining({ role: "user" }),
       {
         role: "assistant",
         content: null,
-        tool_calls: [{ id: "fc_1", type: "function", function: { name: "search_hotels", arguments: '{"destination":"Kabale"}' } }],
+        tool_calls: [{ id: "fc_1", type: "function", function: { name: "check_availability", arguments: '{"destination":"Kabale"}' } }],
       },
       { role: "tool", tool_call_id: "fc_1", content: '{"status":"ok","echoed":{"destination":"Kabale"}}' },
     ]);
     expect(result.text).toBe('Found: {"status":"ok","echoed":{"destination":"Kabale"}}');
-    expect(result.toolCalls).toEqual(["search_hotels"]);
+    expect(result.toolCalls).toEqual(["check_availability"]);
     expect(result.usage).toEqual({ inputTokens: 220, outputTokens: 30 });
     expect(trace.modelCalls).toHaveLength(2);
-    expect(trace.toolCalls).toEqual([{ name: "search_hotels", ms: expect.any(Number) }]);
+    expect(trace.toolCalls).toEqual([{ name: "check_availability", ms: expect.any(Number) }]);
   });
 
   it("runs several calls in one round one at a time, in order", async () => {
@@ -199,7 +199,7 @@ describe("the tool loop", () => {
   });
 
   it("stops a model that keeps calling tools", async () => {
-    sdk.script = Array.from({ length: MAX_TOOL_ROUNDS + 1 }, () => toolCalls({ name: "search_hotels", args: {} }));
+    sdk.script = Array.from({ length: MAX_TOOL_ROUNDS + 1 }, () => toolCalls({ name: "check_availability", args: {} }));
     await expect(generate(input({ tools, executeTool: async () => ({}) }))).rejects.toThrow(/still calling tools/);
     expect(sdk.requests).toHaveLength(MAX_TOOL_ROUNDS + 1);
   });
