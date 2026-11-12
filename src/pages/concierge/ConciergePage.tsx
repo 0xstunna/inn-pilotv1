@@ -1,15 +1,15 @@
 /**
  * InnPilot AI Concierge — the public product.
  *
- *   /#/                     the network concierge: every participating property
- *   /#/c/:publicHotelId     the same concierge on one hotel's own link
+ *   /#/c/:publicHotelId  one hotel's own concierge link
  *
  * A guest describes where and when they want to stay, sees real options from
  * live inventory, picks one, confirms a summary and gets a real booking
  * reference — without an account and without meeting the PMS behind it.
  *
- * The page talks only to /api/ai/* (src/lib/concierge.ts). It never reads
- * Firestore and never sees a workspace hotelId.
+ * Every conversation belongs to exactly one hotel. The page talks only to
+ * /api/ai/* (src/lib/concierge.ts). It never reads Firestore and never sees
+ * a workspace hotelId.
  */
 import {
   useCallback,
@@ -25,13 +25,11 @@ import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
-  ArrowRight,
   ArrowUp,
   BadgeCheck,
   Building2,
   CalendarCheck,
   Headset,
-  MapPin,
   MessageSquarePlus,
   MessagesSquare,
   SearchX,
@@ -47,7 +45,6 @@ import {
   clearConversation,
   ConciergeError,
   fetchConciergeHotel,
-  fetchNetwork,
   fetchThreadUpdates,
   historyOf,
   loadConversation,
@@ -59,8 +56,6 @@ import {
   sendConciergeMessage,
   type ChatEntry,
   type ConciergeHotel,
-  type NetworkHotel,
-  toneFor,
   type ThreadState,
 } from "../../lib/concierge";
 import { money } from "../../lib/format";
@@ -80,13 +75,6 @@ const AI_POLL_MS = 15_000;
  */
 const POLL_OVERLAP_MS = 30_000;
 
-const NETWORK_SUGGESTIONS = [
-  "I need a double room tonight",
-  "Double room this weekend",
-  "Family room from 10–15 October",
-  "Do you have any rooms free in Kabale?",
-];
-
 const hotelSuggestions = (name: string) => [
   "Is a room free tonight?",
   "Double room this weekend",
@@ -96,7 +84,7 @@ const hotelSuggestions = (name: string) => [
 
 export default function ConciergePage() {
   const { publicHotelId } = useParams();
-  if (publicHotelId === undefined) return <ErrorBoundary><Concierge /></ErrorBoundary>;
+  if (!publicHotelId || !isPublicHotelId(publicHotelId)) return <NotFoundScreen />;
   return <HotelConcierge publicHotelId={publicHotelId} />;
 }
 
@@ -136,7 +124,8 @@ function HotelConcierge({ publicHotelId }: { publicHotelId: string }) {
   if (state.status === "error") return <LoadErrorScreen message={state.message} onRetry={() => setReloadKey((k) => k + 1)} />;
   return (
     <ErrorBoundary>
-      <Concierge hotel={state.hotel} />
+      {/* key: a different hotel gets a fresh conversation and thread state */}
+      <Concierge key={state.hotel.publicHotelId} hotel={state.hotel} />
     </ErrorBoundary>
   );
 }
@@ -145,8 +134,8 @@ function HotelConcierge({ publicHotelId }: { publicHotelId: string }) {
 /* The concierge                                                        */
 /* ------------------------------------------------------------------ */
 
-function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
-  const publicHotelId = hotel?.publicHotelId;
+function Concierge({ hotel }: { hotel: ConciergeHotel }) {
+  const publicHotelId = hotel.publicHotelId;
   const [entries, setEntries] = useState<ChatEntry[]>(() => loadConversation(publicHotelId));
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
@@ -163,7 +152,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
   const toast = useToast();
 
   useEffect(() => {
-    document.title = hotel ? `${hotel.name} · InnPilot AI Concierge` : "InnPilot AI Concierge · Find your stay with AI";
+    document.title = `${hotel.name} · InnPilot AI Concierge`;
   }, [hotel]);
   useEffect(() => saveConversation(publicHotelId, entries), [publicHotelId, entries]);
   useEffect(() => saveThread(publicHotelId, thread), [publicHotelId, thread]);
@@ -277,7 +266,6 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
               id: newId(),
               role: "assistant",
               text: reply.reply,
-              ...(reply.search ? { search: reply.search } : {}),
               ...(reply.availability ? { availability: reply.availability } : {}),
               ...(reply.quote ? { quote: reply.quote } : {}),
               ...(reply.booking ? { booking: reply.booking } : {}),
@@ -365,13 +353,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
       onSend={() => void send(draft)}
       pending={pending}
       large={entries.length === 0}
-      placeholder={
-        entries.length > 0
-          ? "Reply to the concierge…"
-          : hotel
-            ? `Ask ${hotel.name} for a room…`
-            : "I need a double room in Western Uganda from 10–15 October"
-      }
+      placeholder={entries.length > 0 ? "Reply to the concierge…" : `Ask ${hotel.name} for a room…`}
     />
   );
 
@@ -459,7 +441,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
             )}
             {composer}
             <p className="text-[11px] muted mt-1.5 text-center">
-              Rooms, prices and bookings come live from {hotel ? hotel.name : "InnPilot"}' booking systems.
+              Rooms, prices and bookings come live from {hotel.name}'s booking systems.
             </p>
           </div>
         </main>
@@ -472,13 +454,13 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
 /* Frame                                                                */
 /* ------------------------------------------------------------------ */
 
-function TopBar({ hotel, onNewChat, disabled }: { hotel?: ConciergeHotel; onNewChat?: () => void; disabled: boolean }) {
+function TopBar({ hotel, onNewChat, disabled }: { hotel: ConciergeHotel; onNewChat?: () => void; disabled: boolean }) {
   return (
     <header className="sticky top-0 z-30" style={{ background: "var(--brand-navy)", borderBottom: "1px solid var(--rail-border)" }}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <Link to={hotel ? `/c/${hotel.publicHotelId}` : "/"} className="flex items-center gap-2.5 min-w-0" onClick={onNewChat}>
+        <Link to={`/c/${hotel.publicHotelId}`} className="flex items-center gap-2.5 min-w-0" onClick={onNewChat}>
           <img src={innpilotMark} alt="" className="w-7 h-7 rounded-md" />
-          <span className="font-poppins font-semibold text-white truncate">{hotel ? hotel.name : "InnPilot"}</span>
+          <span className="font-poppins font-semibold text-white truncate">{hotel.name}</span>
           <span
             className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5"
             style={{ background: "var(--rail-active)", color: "var(--brand-cyan)" }}
@@ -585,12 +567,12 @@ function Home({
   disabled,
   onSend,
 }: {
-  hotel?: ConciergeHotel;
+  hotel: ConciergeHotel;
   composer: ReactNode;
   disabled: boolean;
   onSend: (text: string) => void;
 }) {
-  const suggestions = hotel ? hotelSuggestions(hotel.name) : NETWORK_SUGGESTIONS;
+  const suggestions = hotelSuggestions(hotel.name);
   return (
     <main className="flex-1">
       <section
@@ -607,23 +589,13 @@ function Home({
               style={{ background: "rgba(45,212,200,0.14)", color: "var(--brand-cyan)", border: "1px solid rgba(45,212,200,0.3)" }}
             >
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--brand-cyan)" }} />
-              {hotel ? `${hotel.city ?? "Live"} · live rooms and prices` : "Live rooms and prices"}
+              {hotel.city ?? "Live"} · live rooms and prices
             </p>
             <h1 className="font-poppins font-semibold text-white mt-5 text-4xl sm:text-6xl leading-[1.05] tracking-tight">
-              {hotel ? (
-                <>
-                  Book your stay at <span style={{ color: "var(--brand-cyan)" }}>{hotel.name}</span>
-                </>
-              ) : (
-                <>
-                  Find a room <span style={{ color: "var(--brand-cyan)" }}>at a hotel</span>
-                </>
-              )}
+              Book your stay at <span style={{ color: "var(--brand-cyan)" }}>{hotel.name}</span>
             </h1>
             <p className="mt-4 text-base sm:text-lg max-w-2xl" style={{ color: "var(--rail-text)" }}>
-              {hotel
-                ? "Tell me when you'd like to stay. I'll check live availability, show you real prices and book your room in this chat."
-                : "Tell me where and when you'd like to stay. I'll check live availability at participating hotels and help you book the right room."}
+              Tell me when you'd like to stay. I'll check live availability, show you real prices and book your room in this chat.
             </p>
           </motion.div>
 
@@ -660,7 +632,7 @@ function Home({
         </div>
       </section>
 
-      {hotel ? <HotelOverview hotel={hotel} /> : <Properties disabled={disabled} onSend={onSend} />}
+      <HotelOverview hotel={hotel} />
 
       <HowItWorks />
 
@@ -671,91 +643,6 @@ function Home({
         </Link>
       </footer>
     </main>
-  );
-}
-
-function Properties({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
-  const [hotels, setHotels] = useState<NetworkHotel[] | null>(null);
-  const [networkError, setNetworkError] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchNetwork(controller.signal)
-      .then((network) => setHotels(network.hotels))
-      .catch(() => {
-        // The list is a courtesy; the concierge works without it.
-        if (!controller.signal.aborted) {
-          setHotels([]);
-          setNetworkError(true);
-        }
-      });
-    return () => controller.abort();
-  }, []);
-
-  if (hotels !== null && hotels.length === 0) {
-    if (networkError) return (
-      <p className="mt-6 text-sm text-center" style={{ color: "var(--text-secondary)" }}>
-        Couldn&rsquo;t load participating properties right now — just ask and I&rsquo;ll still search live.
-      </p>
-    );
-    return null;
-  }
-
-  return (
-    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12" aria-labelledby="properties-title">
-      <div className="flex flex-wrap items-end justify-between gap-2 mb-5">
-        <div>
-          <p className="eyebrow">Participating properties</p>
-          <h2 id="properties-title" className="font-poppins text-2xl font-semibold mt-1" style={{ color: "var(--text)" }}>
-            Where would you like to stay?
-          </h2>
-        </div>
-        {hotels && <p className="text-sm muted">{hotels.length} hotels searched live</p>}
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {hotels === null
-          ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 180, borderRadius: 14 }} />)
-          : hotels.map((hotel) => {
-              const [from, to] = toneFor(hotel.hotel);
-              return (
-                <button
-                  key={hotel.hotel}
-                  type="button"
-                  className="card overflow-hidden text-left transition-shadow hover:shadow-lg disabled:opacity-60"
-                  onClick={() => onSend(`What rooms are available at ${hotel.name}?`)}
-                  disabled={disabled}
-                >
-                  <div className="px-4 pt-3 pb-5" style={{ background: `linear-gradient(135deg, ${from}, ${to})`, color: "#fff" }}>
-                    <Building2 size={18} className="opacity-80" />
-                    <p className="font-poppins text-lg font-semibold mt-3 leading-tight">{hotel.name}</p>
-                    <p className="text-xs mt-0.5 inline-flex items-center gap-1 opacity-90">
-                      <MapPin size={12} /> {[hotel.city, hotel.region && `${hotel.region} Region`].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
-                  <div className="px-4 py-3 space-y-2">
-                    {hotel.description && (
-                      <p className="text-sm line-clamp-2" style={{ color: "var(--text-secondary)" }}>
-                        {hotel.description}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                        {hotel.lowestRate !== null ? (
-                          <>
-                            From <strong style={{ color: "var(--text)" }}>{money(hotel.lowestRate, hotel.currency)}</strong> / night
-                          </>
-                        ) : (
-                          "Rates on request"
-                        )}
-                      </span>
-                      <ArrowRight size={16} style={{ color: "var(--primary)" }} />
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-      </div>
-    </section>
   );
 }
 
@@ -864,11 +751,8 @@ function NotFoundScreen() {
   return (
     <CenteredMessage icon={<SearchX size={22} />} title="We couldn't find this hotel">
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        This link doesn't match a hotel. You can still search all hotels.
+        This link doesn't match a hotel. Please reopen the concierge from the hotel's own page.
       </p>
-      <Link to="/" className="btn btn-primary">
-        <AssistantAvatar size={20} /> Search all hotels
-      </Link>
     </CenteredMessage>
   );
 }

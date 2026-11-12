@@ -19,31 +19,26 @@ import {
   Copy,
   Headset,
   Mail,
-  MapPin,
   Moon,
   Pencil,
   Phone,
   RotateCcw,
   ShieldCheck,
   Sparkles,
-  Users,
 } from "lucide-react";
 
 import { CONFIRM_BOOKING_MESSAGE } from "../../lib/confirmation";
 import { money, plural } from "../../lib/format";
 import {
-  chooseOptionMessage,
   chooseRoomTypeMessage,
   parseReply,
   stayDay,
   stayRange,
-  toneFor,
   type ChatEntry,
   type ConciergeAvailability,
   type ConciergeBooking,
-  type ConciergeOption,
   type ConciergeQuote,
-  type ConciergeSearch,
+  type GuestRequestAck,
 } from "../../lib/concierge";
 
 /* ------------------------------------------------------------------ */
@@ -155,10 +150,10 @@ export function MessageBubble({ entry, actions, sending }: { entry: ChatEntry; a
             <ReplyText text={entry.text} />
           </div>
         )}
-        {entry.search && <SearchResults search={entry.search} actions={actions} />}
         {entry.availability && <AvailabilityCard availability={entry.availability} actions={actions} />}
         {entry.quote && !entry.booking && <BookingSummaryCard quote={entry.quote} actions={actions} />}
         {entry.booking && <BookingConfirmedCard booking={entry.booking} />}
+        {entry.guestRequest && <GuestRequestAckCard request={entry.guestRequest} />}
       </div>
     </motion.div>
   );
@@ -233,118 +228,6 @@ export function ErrorNotice({ message, onRetry }: { message: string; onRetry?: (
 }
 
 /* ------------------------------------------------------------------ */
-/* Search results                                                       */
-/* ------------------------------------------------------------------ */
-
-function availabilityLabel(rooms: number): string {
-  return rooms === 1 ? "Last room available" : `${rooms} rooms available`;
-}
-
-export function SearchResults({ search, actions }: { search: ConciergeSearch; actions: EntryActions }) {
-  const alternatives = search.options.some((option) => !option.matchesRequestedRoomType);
-  return (
-    <section aria-label="Available options" className="space-y-2.5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--text-secondary)" }}>
-        <span className="inline-flex items-center gap-1.5 font-semibold" style={{ color: "var(--text)" }}>
-          <CalendarDays size={14} /> {stayRange(search.checkIn, search.checkOut)}
-        </span>
-        <span>{plural(search.nights, "night")}</span>
-        {search.destination && (
-          <span className="inline-flex items-center gap-1">
-            <MapPin size={12} /> {search.destination}
-          </span>
-        )}
-        <span className="inline-flex items-center gap-1" style={{ color: "var(--success-text)" }}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--success)" }} /> Live availability ·{" "}
-          {plural(search.hotelsSearched, "hotel")} searched
-        </span>
-      </div>
-      {alternatives && search.roomType && (
-        <p className="text-xs" style={{ color: "var(--warning-text)" }}>
-          No {search.roomType} room is free for these dates. These are other rooms available.
-        </p>
-      )}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {search.options.map((option) => (
-          <OptionCard key={`${option.hotel}-${option.roomType}`} option={option} actions={actions} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function OptionCard({ option, actions }: { option: ConciergeOption; actions: EntryActions }) {
-  const [from, to] = toneFor(option.hotel);
-  return (
-    <motion.article
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: option.optionNumber * 0.05 }}
-      className="card overflow-hidden flex flex-col"
-      aria-label={`Option ${option.optionNumber}: ${option.roomType} at ${option.hotelName}`}
-    >
-      <div className="relative px-4 pt-3 pb-4" style={{ background: `linear-gradient(135deg, ${from}, ${to})`, color: "#fff" }}>
-        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide opacity-90">
-          <span>Option {option.optionNumber}</span>
-          <span className="rounded-full px-2 py-0.5" style={{ background: "rgba(255,255,255,0.18)" }}>
-            {availabilityLabel(option.availableRooms)}
-          </span>
-        </div>
-        <h3 className="font-poppins text-lg font-semibold mt-3 leading-tight">{option.hotelName}</h3>
-        <p className="text-xs mt-0.5 inline-flex items-center gap-1 opacity-90">
-          <MapPin size={12} /> {[option.city, option.region && `${option.region} Region`].filter(Boolean).join(" · ")}
-        </p>
-      </div>
-
-      <div className="px-4 py-3 flex-1 space-y-2.5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" style={{ color: "var(--text)" }}>
-          <span className="inline-flex items-center gap-1.5 font-semibold">
-            <BedDouble size={15} style={{ color: "var(--primary)" }} /> {option.roomType}
-          </span>
-          {option.capacity !== null && (
-            <span className="inline-flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
-              <Users size={13} /> Sleeps {option.capacity}
-            </span>
-          )}
-        </div>
-        {option.amenities.length > 0 && (
-          <ul className="flex flex-wrap gap-1.5" aria-label="Amenities">
-            {option.amenities.slice(0, 5).map((amenity) => (
-              <li key={amenity} className="text-[11px] rounded-full px-2 py-0.5" style={{ background: "var(--surface-muted)", color: "var(--text-secondary)" }}>
-                {amenity}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="px-4 pb-4 pt-1 flex items-end justify-between gap-3">
-        <div>
-          <p className="font-poppins text-xl font-semibold leading-none" style={{ color: "var(--text)" }}>
-            {money(option.nightlyRate, option.currency)}
-            <span className="text-xs font-normal font-sans" style={{ color: "var(--text-muted)" }}>
-              {" "}
-              / night
-            </span>
-          </p>
-          <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-            {plural(option.nights, "night")} · <strong style={{ color: "var(--text)" }}>{money(option.stayTotal, option.currency)}</strong> total
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm shrink-0"
-          disabled={actions.disabled}
-          onClick={() => actions.onSend(chooseOptionMessage(option))}
-        >
-          Choose
-        </button>
-      </div>
-    </motion.article>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* One hotel's availability                                             */
 /* ------------------------------------------------------------------ */
 
@@ -380,7 +263,7 @@ export function AvailabilityCard({ availability, actions }: { availability: Conc
                   <BedDouble size={15} style={{ color: "var(--primary)" }} /> {type.roomType}
                 </span>
                 <span className="block text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                  {availabilityLabel(type.availableRooms)}
+                  {type.availableRooms === 1 ? "Last room available" : `${type.availableRooms} rooms available`}
                   {type.capacity !== null && ` · sleeps ${type.capacity}`} · {money(type.nightlyRate, currency)} / night ·{" "}
                   <strong style={{ color: "var(--text)" }}>{money(type.stayTotal, currency)}</strong> total
                 </span>
@@ -596,6 +479,71 @@ export function BookingConfirmedCard({ booking }: { booking: ConciergeBooking })
             )}
           </div>
         )}
+      </div>
+    </motion.div>
+  );
+}
+
+/**
+ * Acknowledgement shown when the concierge logged a guest request or
+ * complaint: the reference number, the department it was routed to, and
+ * that staff will follow up. The AI never promises refunds, compensation
+ * or resolution times here.
+ */
+export function GuestRequestAckCard({ request }: { request: GuestRequestAck }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(request.reference);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Clipboard blocked: the reference is still selectable on screen.
+    }
+  };
+
+  const urgent = request.priority === "urgent" || request.category === "safety";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="card overflow-hidden max-w-md"
+      style={{ borderColor: urgent ? "var(--danger-border)" : "var(--primary-border)" }}
+      aria-label="Request received"
+    >
+      <div className="px-4 py-3 flex items-center justify-between gap-2" style={{ background: urgent ? "var(--danger-soft)" : "var(--primary-soft)" }}>
+        <p className="eyebrow" style={{ color: urgent ? "var(--danger-text)" : "var(--primary-active)" }}>
+          {urgent ? "Urgent request received" : "Request received"}
+        </p>
+        <span className="text-[11px] inline-flex items-center gap-1" style={{ color: urgent ? "var(--danger-text)" : "var(--success-text)" }}>
+          <CheckCircle2 size={13} /> Reference {request.reference}
+        </span>
+      </div>
+      <div className="px-4 py-2 space-y-2">
+        <div className="kv">
+          <span className="kv-label">Department</span>
+          <span className="kv-value">{request.department}</span>
+        </div>
+        <div className="kv">
+          <span className="kv-label">Type</span>
+          <span className="kv-value">{request.type === "complaint" ? "Complaint" : request.type === "feedback" ? "Feedback" : "Request"}</span>
+        </div>
+        <p className="text-sm" style={{ color: "var(--text)" }}>
+          {request.message}
+        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <code className="text-lg font-semibold tracking-wide select-all" style={{ color: "var(--text)" }}>
+            {request.reference}
+          </code>
+          <button type="button" className="icon-btn" onClick={copy} aria-label="Copy reference">
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+          </button>
+        </div>
+      </div>
+      <div className="px-4 pb-4 text-[11px] muted" style={{ borderTop: "1px solid var(--border)" }}>
+        The hotel team will follow up. You don’t need to send this again.
       </div>
     </motion.div>
   );

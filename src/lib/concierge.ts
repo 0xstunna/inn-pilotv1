@@ -2,36 +2,28 @@
  * The AI Concierge's browser side: talking to /api/ai/*, remembering a
  * conversation, and turning a reply into something readable.
  *
- * The page never touches Firestore. Everything it shows comes from the server
- * endpoints, which never return a workspace hotelId (DECISIONS D14). Types are
- * shared with the server so the two can't drift.
- *
- * A conversation belongs to a scope: the network concierge at `/#/`, or one
- * hotel's own link at `/#/c/:publicHotelId` (D25). Each scope keeps its own
- * chat in this tab.
+ * Every conversation belongs to one hotel (`/#/c/:publicHotelId`). Each
+ * scope keeps its own chat in this tab.
  */
 import type {
   AiMessage,
   ConciergeAvailability,
   ConciergeBooking,
   ConciergeHotel,
-  ConciergeNetwork,
   ConciergeOption,
   ConciergeQuote,
   ConciergeReply,
-  ConciergeSearch,
-  NetworkHotel,
+  GuestRequestAck,
 } from "../../server/ai/types";
 
 export type {
   ConciergeAvailability,
   ConciergeBooking,
   ConciergeHotel,
-  ConciergeNetwork,
   ConciergeOption,
   ConciergeQuote,
-  ConciergeSearch,
-  NetworkHotel,
+  ConciergeReply,
+  GuestRequestAck,
 };
 
 /** Mirrors the gateway's own cap: older turns are dropped there anyway. */
@@ -86,11 +78,6 @@ async function call<T>(input: string, init?: RequestInit): Promise<T> {
     );
   }
   return body as T;
-}
-
-/** The participating hotels, for the home page. */
-export function fetchNetwork(signal?: AbortSignal): Promise<ConciergeNetwork> {
-  return call<ConciergeNetwork>("/api/ai/network", { signal });
 }
 
 /** One hotel's public header, for its own concierge link. */
@@ -155,10 +142,11 @@ export interface ChatEntry {
   id: string;
   role: "user" | "assistant";
   text: string;
-  search?: ConciergeSearch;
   availability?: ConciergeAvailability;
   quote?: ConciergeQuote;
   booking?: ConciergeBooking;
+  /** A logged guest request/complaint, shown as an acknowledgement with its reference. */
+  guestRequest?: GuestRequestAck;
   /** A guest message that never got an answer. Shown, but not sent as history. */
   failed?: boolean;
   /** An assistant-side message written by hotel staff rather than the AI. */
@@ -170,7 +158,7 @@ export function historyOf(entries: ChatEntry[]): AiMessage[] {
   return entries.filter((entry) => !entry.failed).map(({ role, text }) => ({ role, content: text }));
 }
 
-const scopeOf = (publicHotelId?: string) => publicHotelId || "network";
+const scopeOf = (publicHotelId?: string) => publicHotelId ?? "";
 const storageKey = (publicHotelId?: string) => `innpilot_concierge:${scopeOf(publicHotelId)}`;
 const threadKey = (publicHotelId?: string) => `innpilot_concierge_thread:${scopeOf(publicHotelId)}`;
 
