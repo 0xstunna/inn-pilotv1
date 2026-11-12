@@ -67,7 +67,8 @@ export interface ChannelConfig {
  * `configured()` tells the UI whether this channel is ready to use.
  * `receive()` turns an inbound webhook into an InnPilot message.
  * `send()` delivers a staff reply to the guest.
- * `verifyWebhook()` checks a webhook request's signature (when the platform signs them).
+ * `verifyWebhook()` checks a webhook request's verification token (GET).
+ * `verifySignature()` checks a webhook request's HMAC signature (POST).
  */
 export interface ChannelAdapter {
   readonly id: Channel;
@@ -76,6 +77,8 @@ export interface ChannelAdapter {
   receive(env: Record<string, string | undefined>, raw: unknown): Promise<InboundMessage | null>;
   send(env: Record<string, string | undefined>, message: OutboundMessage): Promise<SendResult>;
   verifyWebhook?(env: Record<string, string | undefined>, req: unknown, signature?: string): Promise<boolean>;
+  /** Verifies the HMAC-SHA256 signature of a POST webhook body. */
+  verifySignature?(env: Record<string, string | undefined>, rawBody: string, signature: string): Promise<boolean>;
 }
 
 /** Adapters registered by channel id. Empty until adapters are added below. */

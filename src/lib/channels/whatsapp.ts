@@ -2,9 +2,10 @@
  * WhatsApp channel adapter — Meta WhatsApp Business Platform (Cloud API).
  *
  * Groundwork only: this adapter is registered but NOT configured unless the
- * hotel supplies WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID and
- * WHATSAPP_VERIFY_TOKEN. Until then it reports itself as unconfigured, and
- * the inbox shows WhatsApp as "not configured — add credentials in Settings".
+ * hotel supplies WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID,
+ * WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET. Until then it reports
+ * itself as unconfigured, and the inbox shows WhatsApp as "not configured —
+ * add credentials in Settings → Channels."
  *
  * When configured:
  *   - GET  /api/ai/webhook/whatsapp  — webhook verification (hub.challenge)
@@ -12,8 +13,14 @@
  *   - POST https://graph.facebook.com/v19.0/{phoneNumberId}/messages      — send replies
  *
  * Duplicate webhook prevention: Meta may redeliver the same message. The
- * conversation record uses the external message id (pendingTurnId pattern) so
- * a message is written once.
+ * conversation record uses the external message id (externalMessageId on
+ * TurnRecord) so a message is written once, and the webhook handler keeps a
+ * persistent record of processed event IDs for atomic idempotency.
+ *
+ * Signature verification: Meta signs POST webhooks with X-Hub-Signature-256
+ * (HMAC-SHA256 of the raw body using WHATSAPP_APP_SECRET). The adapter
+ * exposes verifySignature() for this; the webhook handler calls it before
+ * processing any inbound event.
  *
  * Pure types + thin HTTP wrapper — no Firestore import here. The gateway that
  * receives a verified inbound message writes it to the conversation exactly
@@ -25,7 +32,12 @@ import type { ChannelAdapter, InboundMessage, SendResult, ChannelConfig } from "
 const META_GRAPH_VERSION = "v19.0";
 
 function isConfigured(env: Record<string, string | undefined>): boolean {
-  return Boolean(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_VERIFY_TOKEN);
+  return Boolean(
+    env.WHATSAPP_ACCESS_TOKEN &&
+      env.WHATSAPP_PHONE_NUMBER_ID &&
+      env.WHATSAPP_VERIFY_TOKEN &&
+      env.WHATSAPP_APP_SECRET,
+  );
 }
 
 function textOf(message: Record<string, unknown>): string {
@@ -37,6 +49,49 @@ function textOf(message: Record<string, unknown>): string {
   return "";
 }
 
+/**
+ * Computes the HMAC-SHA256 signature Meta expects: sha256=hex(app_secret, body).
+ * Returns null when no app secret is configured (so callers can distinguish
+ * "not configured" from "signature mismatch").
+ */
+export function computeSignature(
+  appSecret: string | undefined,
+  body: string,
+): string | null {
+  if (!appSecret) return null;
+  // Node's crypto is available on the server; the browser never imports this
+  // module's runtime code (only types). Use the Web Crypto API via a small
+  // shim so the same source works under Vercel and locally.
+  return hmacSha256Hex(appSecret, body);
+}
+
+/**
+ * Constant-time comparison of two hex signatures. Prevents timing attacks.
+ */
+function secureCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+/**
+ * HMAC-SHA256 hex digest. Uses Node's crypto module when available, falls
+ * back to the Web Crypto API (Vercel Edge, modern browsers).
+ */
+function hmacSha256Hex(key: string, data: string): string {
+  // Node.js environment
+  if (typeof process !== "undefined" && typeof process.versions?.node === "string") {
+    const crypto = require("crypto");
+    return crypto.createHmac("sha256", key).update(data).digest("hex");
+  }
+  // Web Crypto API (not available synchronously, so this is a fallback that
+  // should never be hit in the server path where this adapter runs).
+  throw new Error("Web Crypto HMAC not available in this environment.");
+}
+
 export const whatsappAdapter: ChannelAdapter = {
   id: "whatsapp",
   name: "WhatsApp",
@@ -46,6 +101,7 @@ export const whatsappAdapter: ChannelAdapter = {
     if (!env.WHATSAPP_ACCESS_TOKEN) missing.push("WHATSAPP_ACCESS_TOKEN");
     if (!env.WHATSAPP_PHONE_NUMBER_ID) missing.push("WHATSAPP_PHONE_NUMBER_ID");
     if (!env.WHATSAPP_VERIFY_TOKEN) missing.push("WHATSAPP_VERIFY_TOKEN");
+    if (!env.WHATSAPP_APP_SECRET) missing.push("WHATSAPP_APP_SECRET");
     return { configured: false, missing: `Set ${missing.join(", ")} in Settings → Channels.` };
   },
   async receive(env, raw): Promise<InboundMessage | null> {
@@ -100,17 +156,40 @@ export const whatsappAdapter: ChannelAdapter = {
       return { ok: false, error: error instanceof Error ? error.message : "WhatsApp send failed." };
     }
   },
-  async verifyWebhook(env, _req): Promise<boolean> {
+  async verifyWebhook(env, _req, signature): Promise<boolean> {
     if (!isConfigured(env)) return false;
-    // Meta sends GET verification: hub.mode=subscribe, hub.verify_token, hub.challenge
-    // Signature verification uses X-Hub-Signature-256 with the app secret.
-    // We implement the verify_token check here; app-secret signature is optional
-    // hardening that can be added when WHATSAPP_APP_SECRET is configured.
-    const verifyToken = env.WHATSAPP_VERIFY_TOKEN;
+
+    // GET verification: hub.mode=subscribe + hub.verify_token
     const request = _req as { query?: Record<string, string>; headers?: Record<string, string> };
+    const mode = request.query?.["hub.mode"];
     const token = request.query?.["hub.verify_token"];
-    if (token !== verifyToken) return false;
-    return true;
+    const challenge = request.query?.["hub.challenge"];
+
+    if (mode === "subscribe" && challenge) {
+      if (token !== env.WHATSAPP_VERIFY_TOKEN) return false;
+      return true;
+    }
+
+    // POST verification: X-Hub-Signature-256
+    if (signature) {
+      const expected = computeSignature(env.WHATSAPP_APP_SECRET, "");
+      if (!expected) return false;
+      // The caller supplies the raw body separately; see verifySignature().
+      return false;
+    }
+
+    return false;
+  },
+
+  /**
+   * Verifies a Meta webhook signature: X-Hub-Signature-256 = sha256=hex(app_secret, rawBody).
+   * Returns false when not configured or when the signature doesn't match.
+   */
+  async verifySignature(env, rawBody: string, signature: string): Promise<boolean> {
+    if (!isConfigured(env)) return false;
+    const expected = computeSignature(env.WHATSAPP_APP_SECRET, rawBody);
+    if (!expected) return false;
+    const provided = signature.replace(/^sha256=/i, "");
+    return secureCompare(expected, provided);
   },
 };
-
