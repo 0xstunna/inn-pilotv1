@@ -288,7 +288,6 @@ export async function recordTurn(scope: HotelScope, conversation: OpenConversati
         closed: false,
         handledBy: "ai",
         reservationId: "",
-        mock: false,
         hotelId: scope.hotelId,
         createdAt: new Date(receivedAt),
         ...summary,

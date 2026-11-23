@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBookingDoc,
   checkRoomBookable,
+  derivePaymentStatus,
   isRoomBookable,
   makeReservationId,
   nightlyRateOf,
@@ -110,6 +111,18 @@ describe("nightlyRateOf", () => {
   });
 });
 
+describe("derivePaymentStatus", () => {
+  it.each([
+    [440000, 0, "Unpaid"],
+    [440000, 200000, "Pending"],
+    [440000, 440000, "Paid"],
+    [440000, 500000, "Paid"],
+    [0, 0, "Unpaid"],
+  ])("total %o, paid %o → %o", (total, paid, expected) => {
+    expect(derivePaymentStatus(total, paid)).toBe(expected);
+  });
+});
+
 describe("buildBookingDoc", () => {
   const base = {
     hotelId: "HotelA",
@@ -125,6 +138,7 @@ describe("buildBookingDoc", () => {
     const createdAt = Symbol("server-timestamp");
     expect(buildBookingDoc(base, createdAt)).toEqual({
       reservationId: "RSV-20261001-ABC123",
+      conversationId: "",
       guestName: "Amina Okello",
       guestPhoneNumber: "",
       roomNumber: "101",
@@ -134,11 +148,13 @@ describe("buildBookingDoc", () => {
       checkOut: base.checkOut,
       pricePaid: 0,
       paymentStatus: "Pending",
+      paymentHistory: [],
       notes: "",
       status: "Confirmed",
       isOccupied: false,
       hotelId: "HotelA",
       createdAt,
+      updatedAt: createdAt,
     });
   });
 

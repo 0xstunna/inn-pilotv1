@@ -41,7 +41,6 @@ const input = {
   currency: "UGX",
   phone: "",
   email: "",
-  roomCount: 3,
 };
 
 beforeEach(() => {
@@ -66,7 +65,7 @@ describe("planRooms", () => {
 });
 
 describe("createWorkspace", () => {
-  it("writes the hotel, its public id mapping and its rooms in one batch, with matching ids", async () => {
+  it("writes the hotel and its public id mapping in one batch, with no rooms", async () => {
     const result = await createWorkspace(input);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -82,8 +81,8 @@ describe("createWorkspace", () => {
 
     expect(hotel?.data).toMatchObject({ name: "Lakeside Inn & Spa", publicId });
     expect(mapping?.data).toEqual({ hotelId, createdAt: "<serverTimestamp>" });
-    expect(rooms).toHaveLength(3);
-    expect(firestore.writes).toHaveLength(5);
+    expect(rooms).toHaveLength(0);
+    expect(firestore.writes).toHaveLength(2);
   });
 
   it("gives every new workspace its own public id", async () => {

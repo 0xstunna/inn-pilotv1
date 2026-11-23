@@ -105,6 +105,8 @@ export interface BookRoomInput {
   notes?: string;
   /** Refuse to book unless the room's stay total is exactly this. */
   expectedTotal?: number;
+  /** The guest thread this booking belongs to. */
+  conversationId?: string;
 }
 
 /**
@@ -144,6 +146,7 @@ export async function bookRoom(scope: HotelScope, input: BookRoomInput): Promise
         {
           hotelId: scope.hotelId,
           reservationId,
+          conversationId: input.conversationId,
           room,
           guestName: input.guestName,
           guestPhoneNumber: input.guestPhoneNumber,
@@ -152,10 +155,11 @@ export async function bookRoom(scope: HotelScope, input: BookRoomInput): Promise
           checkIn,
           checkOut,
           pricePaid: 0,
-          paymentStatus: "Pending",
+          paymentStatus: "Unpaid",
           notes: input.notes,
           source: "concierge",
           quotedTotal: totalPrice,
+          totalAmount: totalPrice,
         },
         scope.serverTimestamp()
       )
@@ -255,6 +259,7 @@ export const createReservationTool: ConciergeTool = {
         numberOfGuests: pending.numberOfGuests,
         notes: readString(args, "notes", 500),
         expectedTotal: pending.totalPrice,
+        conversationId: context.conversationId,
       });
       if (result.status === "confirmed") {
         const booking: ConciergeBooking = {
@@ -273,7 +278,8 @@ export const createReservationTool: ConciergeTool = {
           nightlyRate: Number(result.nightlyRate),
           totalPrice: Number(result.totalPrice),
           currency: scope.profile.currency,
-          paymentStatus: "Pending",
+          paymentStatus: "Unpaid",
+          conversationId: context.conversationId,
         };
         return {
           status: "confirmed",

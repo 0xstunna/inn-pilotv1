@@ -1,13 +1,11 @@
 /**
  * The inbox's live data and the few things staff can do to a conversation:
  * take it over, hand it back to the AI, reply, send a follow-up or put one
- * off, and add the sample threads for the MOCKED channels.
+ * off.
  *
- * Writes go through firestore.rules like every other module. A staff reply
- * or follow-up on WhatsApp is delivered through the WhatsApp adapter (Meta
- * Cloud API) when credentials are configured; Instagram and Email are
- * recorded in the thread only. On the web channel the guest's concierge page
- * picks the reply up.
+ * Web is the only live channel here; WhatsApp and the other channels are
+ * coming soon. Writes go through firestore.rules like every other module,
+ * and the guest's concierge page picks web replies up.
  */
 import { useEffect, useState } from "react";
 import {
@@ -28,7 +26,6 @@ import { logAction } from "./audit";
 import { COLLECTIONS } from "./collections";
 import {
   MAX_MESSAGE_TEXT,
-  sampleThreads,
   sortConversations,
   toConversation,
   toMessage,
@@ -38,7 +35,6 @@ import {
 } from "./conversations";
 import { SNOOZE_HOURS } from "./followUps";
 import { hotelCollection } from "./hotelScope";
-import { detectSignals, mergeSignals, NO_SIGNALS, scoreLead } from "./leadScoring";
 import { fail, ok, type ServiceResult } from "./serviceResult";
 
 const LIST_LIMIT = 200;
@@ -326,50 +322,4 @@ export async function snoozeFollowUp(hotelId: string, conversation: Conversation
     return fail("Couldn't update this conversation. Please try again.");
   }
   return ok(null);
-}
-
-/** Adds the sample WhatsApp, Instagram and Email threads (MOCKED channels). */
-export async function addSampleConversations(hotelId: string, hotelName: string): Promise<ServiceResult<{ added: number }>> {
-  const now = Date.now();
-  const threads = sampleThreads(hotelName);
-  const batch = writeBatch(db);
-  for (const thread of threads) {
-    const ref = doc(hotelCollection(hotelId, COLLECTIONS.CONVERSATIONS));
-    const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000);
-    const last = thread.messages[thread.messages.length - 1];
-    // When the guest last wrote: a follow-up's wait is measured from it (D21).
-    const lastGuest = [...thread.messages].reverse().find((message) => message.role === "guest") ?? last;
-    // Scored by the same rules as a real conversation, from what the sample
-    // guest says: a quoted or booked thread has seen availability.
-    const { bookingStatus } = thread.conversation;
-    const leadSignals = mergeSignals(
-      thread.messages
-        .filter((message) => message.role === "guest")
-        .reduce((signals, message) => mergeSignals(signals, detectSignals(message.text)), NO_SIGNALS),
-      { sawAvailability: bookingStatus !== "none" }
-    );
-    batch.set(ref, {
-      ...thread.conversation,
-      lead: scoreLead({ bookingStatus, signals: leadSignals }),
-      leadSignals,
-      mock: true,
-      messageCount: thread.messages.length,
-      lastMessage: { role: last.role, text: last.text, at: at(last.minutesAgo) },
-      lastGuestAt: at(lastGuest.minutesAgo),
-      hotelId,
-      createdAt: at(thread.messages[0].minutesAgo),
-      updatedAt: at(last.minutesAgo),
-    });
-    for (const message of thread.messages) {
-      batch.set(doc(collection(ref, "messages")), { role: message.role, text: message.text, at: at(message.minutesAgo), hotelId });
-    }
-  }
-  try {
-    await batch.commit();
-  } catch (err) {
-    console.error("Failed to add sample conversations:", err);
-    return fail("Couldn't add the sample conversations. Please try again.");
-  }
-  logAction(hotelId, "Sample conversations added", "conversation", null, `${threads.length} mocked-channel threads`);
-  return ok({ added: threads.length });
 }

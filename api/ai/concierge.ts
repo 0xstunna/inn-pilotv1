@@ -161,6 +161,7 @@ function pickQuote(summary: ConciergeQuote): ConciergeQuote {
 function pickBooking(booking: ConciergeBooking): ConciergeBooking {
   return {
     reservationId: String(booking.reservationId),
+    conversationId: String(booking.conversationId ?? ""),
     hotel: String(booking.hotel),
     hotelName: String(booking.hotelName),
     city: String(booking.city ?? ""),

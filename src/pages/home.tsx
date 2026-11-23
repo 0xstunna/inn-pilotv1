@@ -10,7 +10,6 @@ import {
   Wallet,
   KeyRound,
   Sparkles,
-  Zap,
   Bot,
   Headset,
   Clock,
@@ -116,31 +115,31 @@ const fadeUp = {
    Feature grid
    ------------------------------------------------------------ */
 const features: { icon: React.ReactNode; title: string; description: string }[] = [
-  { icon: <Bot size={20} />, title: "AI Concierge for guests", description: "Answers guest messages, checks availability and takes bookings 24/7 — every chat lands in your inbox." },
+  { icon: <Bot size={20} />, title: "Chat interface for guests", description: "Answers guest messages, checks availability and takes bookings 24/7 — every chat lands in your inbox." },
   { icon: <Headset size={20} />, title: "Staff inbox", description: "Every guest conversation in one place. Take over any thread, reply, or hand it back to the AI." },
-  { icon: <BedDouble size={20} />, title: "Rooms & reservations", description: "Track bookings from confirmation to check-out with live availability, so no room is ever double-booked." },
-  { icon: <LayoutDashboard size={20} />, title: "Dashboard with AI metrics", description: "AI-sourced bookings, revenue, inquiry-to-booking conversion and average response time — all owner-facing." },
-  { icon: <Clock size={20} />, title: "Set up in under a minute", description: "Create your hotel's workspace, get a ready-made room inventory with nightly rates, and take your first booking. No sign-up, no installation." },
-  { icon: <Wallet size={20} />, title: "Honest payments", description: "Guests pay at the hotel on arrival. No fake deposit buttons, no hidden payment claims." },
+  { icon: <BedDouble size={20} />, title: "Add rooms, rates & reservations", description: "Track bookings from confirmation to check-out with live availability, so no room is ever double-booked." },
+  { icon: <LayoutDashboard size={20} />, title: "Dashboard with metrics", description: "Confirmed bookings vs Actual stays, Revenue generated, inquiry-to-booking conversion and average response time — for your hotel." },
+  { icon: <Clock size={20} />, title: "WhatsApp Integration(coming soon)", description: "Handle guest enquires, book stays, and get realtime information about rooms availability and rates via Hotel's WhatsApp and handle everything in dashboard" },
+  { icon: <Wallet size={20} />, title: "Honest payments", description: "Guests pay at the hotel on arrival. Or as guided by staff according to hotel policies." },
 ];
 
 /* ------------------------------------------------------------
    Why independent hotels choose InnPilot
    ------------------------------------------------------------ */
-const valueProps: { icon: React.ReactNode; title: string; description: string }[] = [
-  { icon: <Zap size={20} />, title: "Built for how you actually run a hotel", description: "Not a scaled-down enterprise suite. InnPilot is sized, priced and designed for independent properties." },
-  { icon: <Bot size={20} />, title: "AI Concierge, not just a chat widget", description: "Guests get real availability, real prices and confirmed bookings — not a form they never hear back from." },
-  { icon: <Headset size={20} />, title: "Your team stays in control", description: "Every guest conversation lands in your inbox. Take over any thread, reply, or hand it back to the AI." },
-  { icon: <Wallet size={20} />, title: "Priced for independent operations", description: "No enterprise contracts or per-module upsells. Straightforward pricing that scales with your property." },
-];
+// const valueProps: { icon: React.ReactNode; title: string; description: string }[] = [
+//   { icon: <Zap size={20} />, title: "Built t ", description: "Not a scaled-down enterprise suite. InnPilot is sized, priced and designed for independent properties." },
+//   { icon: <Bot size={20} />, title: "AI Concierge, not just a chat widget", description: "Guests get real availability, real prices and confirmed bookings — not a form they never hear back from." },
+//   { icon: <Headset size={20} />, title: "Your team stays in control", description: "Every guest conversation lands in your inbox. Take over any thread, reply, or hand it back to the AI." },
+//   { icon: <Wallet size={20} />, title: "Priced for independent operations", description: "No enterprise contracts or per-module upsells. Straightforward pricing that scales with your property." },
+// ];
 
 /* ------------------------------------------------------------
    FAQ
    ------------------------------------------------------------ */
 const faqs: { q: string; a: string }[] = [
   { q: "Do I need to create an account?", a: "No. Click Get Started, tell us about your hotel and your workspace is ready straight away. There is no sign-up and no password." },
-  { q: "What do I get when I create a workspace?", a: "A dashboard for your hotel with a starting room inventory and nightly rates in your currency, so you can take a reservation immediately. Add rooms any time from Rooms." },
-  { q: "How long does setup take?", a: "Under a minute. Name your hotel, add your contact details and how many rooms you have, and InnPilot builds your workspace." },
+  { q: "What do I get when I create a workspace?", a: "A dashboard for your hotel in your currency. Add your real rooms and nightly rates in the Rooms page, then you can take a reservation." },
+  { q: "How long does setup take?", a: "Under a minute. Name your hotel and add your contact details, then InnPilot builds your workspace. Rooms are added afterwards, when you know your real inventory." },
   { q: "Do you publish pricing?", a: "Every workspace starts on a free trial. Pricing is straightforward and scales with your property — no enterprise contracts or per-module upsells." },
   { q: "Does InnPilot work if my internet connection is unreliable?", a: "InnPilot is a cloud-based platform designed to stay fast and responsive on the connectivity typical of independent hotels." },
 ];
@@ -220,29 +219,20 @@ const LandingPage = () => {
         <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-2 gap-12 items-center">
           <motion.div initial="hidden" animate="show" variants={fadeUp}>
             <span className="inline-block text-xs font-semibold tracking-wide uppercase text-[var(--brand-cyan)] mb-4">
-              InnPilot AI Concierge
+              InnPilot
             </span>
-            <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight mb-5">
-              The AI Concierge that books rooms for your hotel
-            </h1>
+            <h2 className="text-4xl sm:text-5xl font-bold text-white leading-tight mb-5">
+              Your Booking Assistant. 
+            </h2>
             <p className="text-[var(--rail-text)] text-base sm:text-lg leading-relaxed mb-8 max-w-xl">
-              Your guests get instant answers, availability checks and confirmed bookings — 24/7.
-              Every conversation lands in your staff inbox, every booking lands in your
+              Guests get instant answers about stay, can do room availability checks, room rates, make reservations directly to the hotel through a guided booking process 24/7.
+              Every conversation lands in your staff inbox for easy follow-up process, every confirmed booking booking lands in your
               reservations, and your team can step in at any moment. Set up in under a minute.
               No sign-up required.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/staff/get-started" className="btn btn-primary px-6 py-3 text-sm inline-flex items-center gap-2">
                 Get Started <ArrowRight size={16} />
-              </Link>
-              {/* Try the guest concierge on a seeded hotel's own link. Requires `npm run seed:k-hotels` to have been run
-                  against the emulator so a publicId exists at /c/:publicHotelId. No seeded hotel exists in Firestore yet;
-                  see the Phase 1 report for details. */}
-              <Link
-                to="/c/k-hotels-kabale-kh26demo"
-                className="btn btn-secondary px-6 py-3 text-sm inline-flex items-center gap-2"
-              >
-                Try the guest concierge <ArrowRight size={16} />
               </Link>
               <a
                 href="#product"
@@ -261,8 +251,8 @@ const LandingPage = () => {
       {/* Feature grid */}
       <section id="features" className="max-w-6xl mx-auto px-6 py-20">
         <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="max-w-2xl mb-10">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">Everything your hotel needs, in one place</h2>
-          <p className="text-slate-500">Built around the day-to-day of running an independent property.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">Set-up for your hotel, in one place</h2>
+          <p className="text-slate-500">Built to solve 1000+ weekly enquiries in hotel's inbox, unreplied to - leading to lost revenue .</p>
         </motion.div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {features.map((f, i) => (
@@ -303,10 +293,10 @@ const LandingPage = () => {
               <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
                 <Bot size={20} />
               </div>
-              <h3 className="font-semibold text-slate-800 mb-2">Guest chats with the AI Concierge</h3>
+              <h3 className="font-semibold text-slate-800 mb-2">Guest chats with the Booking Assistant</h3>
               <p className="text-sm text-slate-500 leading-relaxed mb-4">
                 The guest asks about availability, gets real prices and room options, and confirms a booking —
-                all through the AI Concierge on your hotel's page.
+                all through the Assistant on your hotel's page.
               </p>
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--brand-cyan)]">
                 1 <ArrowRight size={12} />
@@ -343,9 +333,9 @@ const LandingPage = () => {
               <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
                 <BedDouble size={20} />
               </div>
-              <h3 className="font-semibold text-slate-800 mb-2">Booking confirmed in Rooms</h3>
+              <h3 className="font-semibold text-slate-800 mb-2">Booking saved in Reservations</h3>
               <p className="text-sm text-slate-500 leading-relaxed mb-4">
-                Confirmed bookings appear in Rooms with the guest details, dates and room type.
+                Confirmed bookings appear in Reservations with the guest details, dates and room type.
                 Guests pay at the hotel on arrival — no fake deposit buttons.
               </p>
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--brand-cyan)]">
@@ -357,7 +347,7 @@ const LandingPage = () => {
       </section>
 
       {/* Why independent hotels choose InnPilot */}
-      <section className="max-w-6xl mx-auto px-6 py-20">
+      {/* <section className="max-w-6xl mx-auto px-6 py-20">
         <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="max-w-2xl mb-10">
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">Why independent hotels choose InnPilot</h2>
           <p className="text-slate-500">Not a scaled-down enterprise suite, a platform sized and priced for properties like yours.</p>
@@ -381,16 +371,15 @@ const LandingPage = () => {
             </motion.div>
           ))}
         </div>
-      </section>
+      </section> */}
 
       {/* Get Started */}
       <section id="pricing" className="py-20" style={{ background: "var(--rail)" }}>
         <div className="max-w-6xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="text-center max-w-xl mx-auto mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Ready to run your hotel?</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Ready to start?</h2>
             <p className="text-[var(--rail-text)]">
-              Create your workspace in under a minute. Your AI Concierge, staff inbox and
-              room inventory are ready straight away — no sign-up, no installation.
+              Create your hotel's workspace, add your real rooms and nightly rates, and take your first booking. No sign-up, no installation.
             </p>
           </motion.div>
           <div className="max-w-md mx-auto">
@@ -428,7 +417,7 @@ const LandingPage = () => {
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Your hotel deserves better tools.</h2>
             <p className="text-[var(--rail-text)] mb-8 max-w-xl mx-auto">
-              Start running your property with InnPilot.
+              Start  with InnPilot.
             </p>
             <Link to="/staff/get-started" className="btn btn-primary px-8 py-3 text-sm inline-flex items-center gap-2">
               Get Started <ArrowRight size={16} />
@@ -444,7 +433,7 @@ const LandingPage = () => {
             <div>
               <img src={innpilotLogoLight} alt="InnPilot" className="h-8 w-auto object-contain mb-3" />
               <p className="text-sm text-slate-500 leading-relaxed max-w-xs">
-                The AI Concierge for independent hotels — guest chats, staff inbox and room inventory in one workspace.
+                Ready to set-up for your property — guest chats, staff inbox and room inventory in one workspace.
               </p>
             </div>
             <div>

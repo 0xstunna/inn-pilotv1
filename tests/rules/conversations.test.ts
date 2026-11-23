@@ -31,14 +31,13 @@ afterAll(async () => {
 });
 
 const conversation = (overrides: Record<string, unknown> = {}) => ({
-  channel: "whatsapp",
+  channel: "web",
   guestName: "Grace Namusoke",
   guestContact: "+256 772 555 010",
   handledBy: "ai",
   bookingStatus: "quoted",
   reservationId: "",
   lead: null,
-  mock: true,
   messageCount: 1,
   lastMessage: { role: "guest", text: "Hello", at: new Date() },
   hotelId: HOTEL,
@@ -53,7 +52,7 @@ beforeEach(async () => {
     const db = ctx.firestore();
     await setDoc(doc(db, "hotels", HOTEL), { name: "Hotel A", currency: "UGX" });
     await setDoc(doc(db, "hotels", OTHER), { name: "Hotel B", currency: "UGX" });
-    await setDoc(doc(db, "hotels", HOTEL, "conversations", THREAD), conversation({ channel: "web", mock: false }));
+    await setDoc(doc(db, "hotels", HOTEL, "conversations", THREAD), conversation());
     await setDoc(doc(db, "hotels", HOTEL, "conversations", THREAD, "messages", "m1"), {
       role: "guest",
       text: "Is a room free?",
@@ -73,7 +72,7 @@ describe("Conversations", () => {
     await assertSucceeds(getDocs(messages()));
   });
 
-  it("the workspace can add a sample thread with its first message in one batch", async () => {
+  it("the workspace can add a conversation with its first message in one batch", async () => {
     const client = db();
     const batch = writeBatch(client);
     const ref = doc(collection(client, "hotels", HOTEL, "conversations"));

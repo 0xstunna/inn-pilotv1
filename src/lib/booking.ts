@@ -7,7 +7,7 @@
  * room is taken", "this booking is complete" and "this is what a booking
  * document looks like". Change a booking rule here, and both follow.
  */
-import type { BookingStatus } from "./collections.js";
+import type { BookingStatus, PaymentMethod } from "./collections.js";
 
 export interface DateLikeValue {
   toDate?: () => Date;
@@ -183,9 +183,31 @@ export function validateBookingDetails(details: BookingDetails): string | null {
 /** Where a booking came from. Front-desk bookings carry no source. */
 export type BookingSource = "concierge";
 
+/** Manual, staff-recorded payment. Never a gateway transaction. */
+export interface PaymentEntry {
+  amount: number;
+  method: PaymentMethod;
+  reference?: string;
+  note?: string;
+  recordedAt?: unknown;
+  recordedBy?: string;
+}
+
+export type PaymentStatus = "Paid" | "Pending" | "Unpaid";
+
+/** Derive the one payment status used by every booking screen. */
+export function derivePaymentStatus(total: number, paid: number): PaymentStatus {
+  const stayTotal = Number.isFinite(total) ? Math.max(0, total) : 0;
+  const amountPaid = Number.isFinite(paid) ? Math.max(0, paid) : 0;
+  if (amountPaid <= 0) return "Unpaid";
+  if (stayTotal > 0 && amountPaid >= stayTotal) return "Paid";
+  return "Pending";
+}
+
 export interface NewBookingInput {
   hotelId: string;
   reservationId: string;
+  conversationId?: string;
   room: BookableRoom;
   guestName: string;
   guestPhoneNumber?: string;
@@ -194,11 +216,14 @@ export interface NewBookingInput {
   checkIn: Date;
   checkOut: Date;
   pricePaid?: number;
-  paymentStatus: "Paid" | "Pending";
+  paymentStatus: PaymentStatus;
+  paymentHistory?: PaymentEntry[];
   notes?: string;
   source?: BookingSource;
   /** The stay total the guest was quoted, when a system (not staff) priced it. */
   quotedTotal?: number;
+  /** The total amount due for the stay. */
+  totalAmount?: number;
 }
 
 /**
@@ -213,6 +238,7 @@ export function buildBookingDoc<CreatedAt>(input: NewBookingInput, createdAt: Cr
   const guests = Math.floor(Number(input.numberOfGuests));
   return {
     reservationId: input.reservationId,
+    conversationId: input.conversationId ?? "",
     guestName: input.guestName.trim(),
     guestPhoneNumber: input.guestPhoneNumber?.trim() ?? "",
     ...(input.guestEmail?.trim() ? { guestEmail: input.guestEmail.trim() } : {}),
@@ -223,12 +249,15 @@ export function buildBookingDoc<CreatedAt>(input: NewBookingInput, createdAt: Cr
     checkOut: input.checkOut,
     pricePaid: input.pricePaid || 0,
     paymentStatus: input.paymentStatus,
+    paymentHistory: input.paymentHistory ?? [],
     notes: input.notes?.trim() ?? "",
     status: "Confirmed" as BookingStatus,
     isOccupied: false,
     hotelId: input.hotelId,
     createdAt,
+    updatedAt: createdAt,
     ...(input.source ? { source: input.source } : {}),
     ...(input.quotedTotal !== undefined ? { quotedTotal: input.quotedTotal } : {}),
+    ...(input.totalAmount !== undefined ? { totalAmount: input.totalAmount } : {}),
   };
 }

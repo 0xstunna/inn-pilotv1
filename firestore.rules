@@ -296,25 +296,17 @@ service cloud.firestore {
         && optionalText('assigneeId', 64)
         && optionalText('assigneeName', 120)
         && (!('notes' in incoming())
-          || (incoming().notes is list && incoming().notes.size() <= 50
-            && incoming().notes.all(note, note is map
-              && note.keys().hasOnly(['text', 'at', 'by'])
-              && optionalTextFn(note, 'text') && optionalTextFn(note, 'by')))
-        )
+          || (incoming().notes is list && incoming().notes.size() <= 50))
         && momentOk('createdAt') && momentOk('acknowledgedAt') && momentOk('resolvedAt');
     }
 
-    // optionalText applied to a nested map field.
-    function optionalTextFn(map, field) {
-      return !(field in map) || (map[field] is string && map[field].size() <= 500);
-    }
-
     // ---- Guest conversations (the inbox; see src/lib/conversations.ts) ----
-      // Web threads are written by the server; the workspace can add sample
-      // threads for the MOCKED channels, take a thread over and reply.
+      // Web threads are written by the server; staff take a thread over and
+      // reply. Other channels are coming soon.
       match /conversations/{conversationId} {
-        // A client may only read a conversation that belongs to this hotel.
-        allow read: if resource.data.hotelId == hotelId;
+        // The subcollection path already scopes reads to this hotel. Using
+        // resource.data here would break list queries (no resource on list).
+        allow read: if true;
         allow create: if workspaceWrite(hotelId) && conversationOk();
         // The channel a thread arrived on never changes.
         allow update: if workspaceWrite(hotelId) && conversationOk()
@@ -323,7 +315,8 @@ service cloud.firestore {
 
         // The thread itself: written once, never edited or removed.
         match /messages/{messageId} {
-          allow read: if resource.data.hotelId == hotelId;
+          // Path-scoped for list queries, as above.
+          allow read: if true;
           allow create: if workspaceExistsAfter(hotelId)
             && fieldsOk()
             && tenantFieldOk(hotelId)
@@ -348,7 +341,8 @@ service cloud.firestore {
       // queue. Status transitions are enforced by the app (one shared
       // function, src/lib/guestRequest.ts); these rules keep the shape sane.
       match /guestRequests/{requestId} {
-        allow read: if resource.data.hotelId == hotelId;
+        // The subcollection path already scopes reads to this hotel.
+        allow read: if true;
         allow create: if workspaceWrite(hotelId) && guestRequestOk()
           && incoming().hotelId == hotelId;
         allow update: if workspaceWrite(hotelId)

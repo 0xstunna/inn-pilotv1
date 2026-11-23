@@ -153,6 +153,10 @@ export async function processGuestTurn(
   const openThread = await openGuestThread(input.conversationId, network.scopedPublicId);
   const scopedHotel = network.scopedHotel;
   const attachedScope = await scopeForOne(openThread.hotelId);
+  // The summary shown in an earlier turn, if any. Its guest phone is needed to
+  // label the inbox thread after a confirmed booking; outcome.quote below is
+  // only set when prepare_booking ran in THIS turn.
+  const pendingBooking = openThread.pendingBooking;
 
   const outcome = new TurnOutcome(network.resolve.bind(network));
   if (scopedHotel) outcome.focus({ hotelId: scopedHotel.hotelId, publicId: scopedHotel.publicId });
@@ -165,6 +169,7 @@ export async function processGuestTurn(
       turnId: input.turnId,
       replyText: HUMAN_HOLDING_REPLY,
       replyRole: "ai",
+      selected: scopedHotel,
       ...(input.channel ? { channel: input.channel } : {}),
     });
     return {
@@ -183,6 +188,7 @@ export async function processGuestTurn(
       // Only a summary recorded in an EARLIER turn can be confirmed (D27).
       pendingBooking: openThread.pendingBooking,
       now: new Date(startedAt),
+      conversationId: openThread.id,
     },
     requestId,
   );
@@ -223,12 +229,41 @@ export async function processGuestTurn(
     trace,
   });
 
+  // What this turn proved about this hotel: availability/quote, or a confirmed
+  // booking. The inbox mirror uses it to move booking status and lead score forward.
+  const quoted = outcome.quotedHotelIds.has(scopedHotel.hotelId);
+  const booking = outcome.booking && outcome.booking.hotel === scopedHotel.publicId ? outcome.booking : undefined;
+
+  // A summary shown this turn becomes the pending booking for a LATER turn.
+  // A confirmed booking clears it so the same summary can't be booked twice.
+  const pendingBookingUpdate = booking
+    ? null
+    : outcome.quote
+      ? { ...outcome.quote, preparedAt: startedAt }
+      : undefined;
+
   // Record the turn in the canonical thread and every attached inbox mirror.
   await recordGuestTurn(openThread, {
     guestText: input.message,
     receivedAt: startedAt,
     turnId: input.turnId,
     replyText: generation.text,
+    selected: scopedHotel,
+    quoted,
+    ...(pendingBookingUpdate !== undefined ? { pendingBooking: pendingBookingUpdate } : {}),
+    ...(booking
+      ? {
+          booking: {
+            scope: scopedHotel,
+            reservationId: booking.reservationId,
+            guestName: booking.guestName,
+            guestPhone: pendingBooking?.guestPhone ?? outcome.quote?.guestPhone ?? "",
+            nights: booking.nights,
+            guests: booking.numberOfGuests,
+            roomType: booking.roomType,
+          },
+        }
+      : {}),
     ...(input.channel ? { channel: input.channel } : {}),
   }).catch((error: unknown) =>
     console.error("[conciergeTurn] conversation write failed", {

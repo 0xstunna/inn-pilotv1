@@ -50,7 +50,6 @@ function conversation({
     followUpSentAt: null,
     followUpSnoozedUntil: null,
     messageCount: 3,
-    mock: true,
     createdAt: hoursAgo(lastHoursAgo + 2),
     updatedAt: hoursAgo(lastHoursAgo),
     ...rest,

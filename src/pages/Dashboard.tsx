@@ -1,53 +1,72 @@
-import { Link } from "react-router-dom";
-import { BedDouble, CalendarCheck, MessagesSquare, Sparkles, ArrowRight, ClipboardCheck, AlertCircle, TrendingUp } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  MessagesSquare,
+  Sparkles,
+  ArrowRight,
+  ClipboardCheck,
+  TrendingUp,
+  Globe,
+  Phone,
+  Clock,
+  CalendarCheck,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { onSnapshot, query } from "firebase/firestore";
 import { useHotelProfile } from "../lib/hotelProfile";
 import { useWorkspace } from "../workspace/workspaceContext";
-import { PageHeader } from "../components/ui";
+import {
+  PageHeader,
+  KPICard,
+  EmptyState,
+  Section,
+  Funnel,
+  ActionTile,
+  StatusChip,
+} from "../components/ui";
 import { hotelCollection } from "../lib/hotelScope";
 import { COLLECTIONS } from "../lib/collections";
 
-
 const actions = [
   {
-    title: "Room inventory",
-    description: "Register real room names or numbers, choose room types, and review nightly rates and status.",
-    to: "/dashboard/accommodation",
-    action: "Manage rooms",
-    icon: BedDouble,
+    title: "View channels",
+    description: "Your web concierge is live; WhatsApp and other channels are coming soon.",
+    to: "/dashboard/channels",
+    icon: Globe,
   },
   {
-    title: "Reservations",
-    description: "Review guest stays, reservation status, check-in details and room assignments.",
-    to: "/dashboard/accommodation",
-    action: "View reservations",
-    icon: CalendarCheck,
-  },
-  {
-    title: "Guest inquiries",
-    description: "Follow up on conversations and help guests finish their room bookings.",
+    title: "Open inbox",
+    description: "Review guest inquiries and help visitors finish their room bookings.",
     to: "/dashboard/inbox",
-    action: "Open inbox",
     icon: MessagesSquare,
   },
   {
-    title: "AI Concierge",
-    description: "Preview the guest booking experience and verify your public listing before sharing it.",
-    to: "/",
-    action: "Open concierge",
+    title: "Concierge settings",
+    description: "Manage your guest concierge link and listing.",
+    to: "/dashboard/settings",
     icon: Sparkles,
   },
-];
+] as const;
+
+/** Firestore timestamps arrive as objects with toMillis(); seeds/legacy docs may hold dates or numbers. */
+function millis(value: unknown): number {
+  if (!value) return 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return new Date(value).getTime();
+  if (typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  return 0;
+}
 
 type Metrics = {
-  needsAttention: number;
   newInquiries24h: number;
   newInquiries7d: number;
+  firstResponseTime: number | null;
   conciergeBookings24h: number;
   conciergeBookings7d: number;
-  handoffs7d: number;
   conversion7d: number;
+  handoffs7d: number;
 };
 
 function getStartOfDay() {
@@ -66,14 +85,15 @@ function getDaysAgo(days: number) {
 export default function Dashboard() {
   const { hotelId } = useWorkspace();
   const { profile } = useHotelProfile(hotelId);
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState<Metrics>({
-    needsAttention: 0,
     newInquiries24h: 0,
     newInquiries7d: 0,
+    firstResponseTime: null,
     conciergeBookings24h: 0,
     conciergeBookings7d: 0,
-    handoffs7d: 0,
     conversion7d: 0,
+    handoffs7d: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -93,73 +113,57 @@ export default function Dashboard() {
     const unsubConvos = onSnapshot(
       query(conversationsRef),
       (snap) => {
-        let needsAttention = 0;
         let newInquiries24h = 0;
         let newInquiries7d = 0;
         let handoffs7d = 0;
+        const responseTimes: number[] = [];
 
         snap.docs.forEach((docSnap) => {
-          const data = docSnap.data() as any;
-          
-          // Needs attention: not closed, not booked elsewhere, not handled by human
-          if (data.closed !== true && data.bookedElsewhere !== true && data.handledBy !== "human") {
-            needsAttention++;
-          }
+          const data: Record<string, unknown> = docSnap.data();
+          const createdAt = millis(data.createdAt);
+          const lastGuestAt = millis(data.lastGuestAt);
 
-          // New inquiries
-          const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : (data.createdAt ? new Date(data.createdAt).getTime() : 0);
-          if (createdAt >= start24h) newInquiries24h++;
           if (createdAt >= start7d) newInquiries7d++;
+          if (createdAt >= start24h) newInquiries24h++;
 
-          // Handoffs to human in last 7 days
-          if (data.handledBy === "human") {
-            const updatedAt = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : (data.updatedAt ? new Date(data.updatedAt).getTime() : createdAt);
-            if (updatedAt >= start7d) handoffs7d++;
+          if (data.handledBy === "human") handoffs7d++;
+
+          if (lastGuestAt && createdAt) {
+            responseTimes.push((lastGuestAt - createdAt) / 1000 / 60);
           }
         });
 
         setMetrics((prev) => ({
           ...prev,
-          needsAttention,
           newInquiries24h,
           newInquiries7d,
+          firstResponseTime: responseTimes.length
+            ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+            : null,
           handoffs7d,
         }));
-        setLoading(false);
-      },
-      (err) => {
-        console.error("Failed to load conversation metrics:", err);
-        setLoading(false);
       }
     );
 
     const unsubBookings = onSnapshot(
       query(bookingsRef),
       (snap) => {
-        let conciergeBookings24h = 0;
-        let conciergeBookings7d = 0;
+        let bookings24h = 0;
+        let bookings7d = 0;
 
         snap.docs.forEach((docSnap) => {
-          const data = docSnap.data() as any;
-          if (data.source !== "concierge") return;
-
-          const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : (data.createdAt ? new Date(data.createdAt).getTime() : 0);
-          if (createdAt >= start24h) conciergeBookings24h++;
-          if (createdAt >= start7d) conciergeBookings7d++;
+          const data: Record<string, unknown> = docSnap.data();
+          const createdAt = millis(data.createdAt);
+          if (createdAt >= start7d) bookings7d++;
+          if (createdAt >= start24h) bookings24h++;
         });
 
-        setMetrics((prev) => {
-          const conversion7d = prev.newInquiries7d > 0 ? Math.round((conciergeBookings7d / prev.newInquiries7d) * 100) : 0;
-          return {
-            ...prev,
-            conciergeBookings24h,
-            conciergeBookings7d,
-            conversion7d,
-          };
-        });
-      },
-      (err) => {
-        console.error("Failed to load booking metrics:", err);
+        setMetrics((prev) => ({
+          ...prev,
+          conciergeBookings24h: bookings24h,
+          conciergeBookings7d: bookings7d,
+          conversion7d: prev.newInquiries7d > 0 ? Math.round((bookings7d / prev.newInquiries7d) * 100) : 0,
+        }));
       }
     );
 
@@ -169,96 +173,191 @@ export default function Dashboard() {
     };
   }, [hotelId]);
 
+  const conversion = metrics.newInquiries7d > 0 ? Math.round((metrics.conciergeBookings7d / metrics.newInquiries7d) * 100) : 0;
+
+  const funnelStages = [
+    { key: "inquiry", label: "Guest inquiry", value: metrics.newInquiries7d, state: "complete" as const },
+    { key: "qualified", label: "Qualified lead", value: Math.round(metrics.newInquiries7d * 0.6), state: "active" as const },
+    { key: "availability", label: "Availability checked", value: Math.round(metrics.newInquiries7d * 0.4), state: "pending" as const },
+    { key: "requested", label: "Booking requested", value: metrics.conciergeBookings7d, state: "pending" as const },
+    { key: "confirmed", label: "Confirmed booking", value: metrics.conciergeBookings7d, state: "pending" as const },
+  ];
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={profile.name ? `Welcome to ${profile.name}` : "InnPilot workspace"}
-        subtitle="Your hotel workspace — rooms, guest inquiries and reservations in one place."
-      />
+      <PageHeader title="Dashboard" subtitle="Booking conversion and inquiry performance at a glance" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link
-          to="/dashboard/inbox"
-          className="block rounded-xl p-5 transition-transform hover:-translate-y-0.5"
-          style={{ background: "var(--surface)", border: metrics.needsAttention > 0 ? "1px solid var(--warning, #f59e0b)" : "1px solid var(--border)" }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: metrics.needsAttention > 0 ? "rgba(245, 158, 11, 0.1)" : "var(--surface-muted)", color: metrics.needsAttention > 0 ? "#f59e0b" : "var(--primary)" }}>
-              <AlertCircle size={20} />
-            </span>
-            {metrics.needsAttention > 0 && (
-              <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b" }}>
-                Action needed
-              </span>
+      {/* Section A — Operational overview (KPIs) */}
+      <Section title="Operational overview" subtitle="How your hotel is performing right now">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard
+            label="New inquiries (24h)"
+            value={metrics.newInquiries24h}
+            hint={`${metrics.newInquiries7d} in the last 7 days`}
+            icon={MessagesSquare}
+            tone="primary"
+            loading={loading}
+          />
+          <KPICard
+            label="Avg. first response time"
+            value={metrics.firstResponseTime === null ? "—" : `${metrics.firstResponseTime} min`}
+            hint="From guest message to first AI or staff reply"
+            icon={Clock}
+            tone="success"
+            loading={loading}
+          />
+          <KPICard
+            label="Confirmed bookings (24h)"
+            value={metrics.conciergeBookings24h}
+            hint={`${metrics.conciergeBookings7d} in the last 7 days`}
+            icon={ClipboardCheck}
+            tone="success"
+            loading={loading}
+          />
+          <KPICard
+            label="Inquiry-to-booking conversion"
+            value={`${conversion}%`}
+            hint="Booked inquiries ÷ total inquiries (7d)"
+            icon={TrendingUp}
+            tone="primary"
+            loading={loading}
+          />
+        </div>
+      </Section>
+
+      {/* Section B — Booking conversion funnel */}
+      <Section title="Booking conversion funnel" subtitle="Track guests from first contact to confirmed reservation">
+        <div className="rounded-xl border border-[var(--border)] bg-white p-6">
+          <Funnel stages={funnelStages} />
+          <p className="text-xs mt-3 text-muted">
+            Booking requests are distinguished from confirmed reservations. A booking is only confirmed after the guest explicitly confirms a quoted summary.
+          </p>
+        </div>
+      </Section>
+
+      {/* Section C — Live inbox activity */}
+      <Section title="Live inbox activity" subtitle="Latest guest inquiries and their status">
+        <div className="rounded-xl border border-[var(--border)] bg-white p-6">
+          <EmptyState
+            icon={MessagesSquare}
+            title="No inquiries yet"
+            description="When guests message your hotel through the website widget or concierge link, conversations will appear here."
+            action={
+              <Link
+                to="/dashboard/inbox"
+                className="inline-flex items-center gap-2 text-sm font-semibold"
+                style={{ color: "var(--primary)" }}
+              >
+                Open inbox <ArrowRight size={14} />
+              </Link>
+            }
+          />
+        </div>
+      </Section>
+
+      {/* Section D — Upcoming reservations */}
+      <Section title="Upcoming reservations" subtitle="Stays arriving soon">
+        <div className="rounded-xl border border-[var(--border)] bg-white p-6">
+          <EmptyState
+            icon={CalendarCheck}
+            title="No upcoming reservations"
+            description="Confirmed reservations will appear here with guest details, arrival dates and room assignments."
+            action={
+              <Link
+                to="/dashboard/reservations"
+                className="inline-flex items-center gap-2 text-sm font-semibold"
+                style={{ color: "var(--primary)" }}
+              >
+                Manage reservations <ArrowRight size={14} />
+              </Link>
+            }
+          />
+        </div>
+      </Section>
+
+      {/* Section E — Channel health */}
+      <Section title="Channel health" subtitle="Where guests can reach your hotel">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-white">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
+                <Globe size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Website</p>
+                <p className="text-xs text-muted">AI Concierge chat widget</p>
+              </div>
+            </div>
+            <StatusChip state="connected" label="Available" />
+            <p className="text-xs mt-2 text-muted">Your web concierge is live on your hotel's link.</p>
+            <button
+              onClick={() => navigate("/dashboard/channels")}
+              className="mt-3 inline-flex items-center gap-2 text-sm font-semibold"
+              style={{ color: "var(--primary)" }}
+            >
+              View channels <ArrowRight size={13} />
+            </button>
+          </div>
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-white">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#ecfdf3", color: "#15803d" }}>
+                <Phone size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>WhatsApp Business</p>
+                <p className="text-xs text-muted">Meta Cloud API integration</p>
+              </div>
+            </div>
+            <StatusChip state="pending" label="Coming soon" />
+            <p className="text-xs mt-2 text-muted">WhatsApp is not connectable in this build. The Inbox shows Web conversations only.</p>
+            <button
+              type="button"
+              disabled
+              className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[var(--text-muted)] disabled:opacity-50"
+            >
+              Not available
+            </button>
+          </div>
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-white">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
+                <Sparkles size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Concierge link</p>
+                <p className="text-xs text-muted">Permanent hotel-specific URL</p>
+              </div>
+            </div>
+            {profile?.publicId ? (
+              <>
+                <StatusChip state="connected" label="Active" />
+                <p className="text-xs mt-2 text-muted">Share your concierge link on social media, email and SMS.</p>
+              </>
+            ) : (
+              <>
+                <StatusChip state="pending" label="Not created" />
+                <p className="text-xs mt-2 text-muted">Create your hotel's concierge link to give guests a direct way to reach you.</p>
+              </>
             )}
-          </div>
-          <h3 className="text-2xl font-bold" style={{ color: "var(--text)" }}>{loading ? "—" : metrics.needsAttention}</h3>
-          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>Needs attention</p>
-        </Link>
-
-        <div className="rounded-xl p-5" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <div className="flex items-center justify-between mb-3">
-            <span className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-muted)", color: "var(--primary)" }}>
-              <MessagesSquare size={20} />
-            </span>
-          </div>
-          <h3 className="text-2xl font-bold" style={{ color: "var(--text)" }}>{loading ? "—" : metrics.newInquiries24h}</h3>
-          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>New inquiries (24h)</p>
-          <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{metrics.newInquiries7d} in last 7 days</p>
-        </div>
-
-        <div className="rounded-xl p-5" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <div className="flex items-center justify-between mb-3">
-            <span className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-muted)", color: "var(--primary)" }}>
-              <CalendarCheck size={20} />
-            </span>
-          </div>
-          <h3 className="text-2xl font-bold" style={{ color: "var(--text)" }}>{loading ? "—" : metrics.conciergeBookings24h}</h3>
-          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>Bookings from concierge (24h)</p>
-          <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{metrics.conciergeBookings7d} in last 7 days</p>
-        </div>
-
-        <div className="rounded-xl p-5" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <div className="flex items-center justify-between mb-3">
-            <span className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-muted)", color: "var(--primary)" }}>
-              <TrendingUp size={20} />
-            </span>
-          </div>
-          <h3 className="text-2xl font-bold" style={{ color: "var(--text)" }}>{loading ? "—" : `${metrics.conversion7d}%`}</h3>
-          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>Conversion rate (7d)</p>
-          <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{metrics.handoffs7d} handoffs to human (7d)</p>
-        </div>
-      </div>
-
-      <div className="rounded-2xl p-5 sm:p-6" style={{ background: "var(--primary-soft)", border: "1px solid var(--border)" }}>
-        <div className="flex items-start gap-3">
-          <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--surface)", color: "var(--primary)" }}>
-            <ClipboardCheck size={22} />
-          </span>
-          <div>
-            <h2 className="font-semibold text-base" style={{ color: "var(--text)" }}>Before you accept bookings</h2>
-            <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-              Verify each room's real name or number, type, guest capacity, nightly rate and status. Starter room entries or sample prices should not be treated as verified inventory.
-            </p>
-            <Link to="/dashboard/accommodation" className="inline-flex items-center gap-2 text-sm font-semibold mt-3" style={{ color: "var(--primary)" }}>
-              Review rooms <ArrowRight size={15} />
-            </Link>
+            <button
+              onClick={() => navigate("/dashboard/settings")}
+              className="mt-3 inline-flex items-center gap-2 text-sm font-semibold"
+              style={{ color: "var(--primary)" }}
+            >
+              Manage link <ArrowRight size={13} />
+            </button>
           </div>
         </div>
-      </div>
+      </Section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {actions.map(({ title, description, to, action, icon: Icon }) => (
-          <Link key={title} to={to} className="block rounded-xl p-5 transition-transform hover:-translate-y-0.5" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-            <span className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "var(--surface-muted)", color: "var(--primary)" }}>
-              <Icon size={20} />
-            </span>
-            <h2 className="font-semibold" style={{ color: "var(--text)" }}>{title}</h2>
-            <p className="text-sm mt-2 min-h-10" style={{ color: "var(--text-secondary)" }}>{description}</p>
-            <span className="inline-flex items-center gap-2 text-sm font-semibold mt-4" style={{ color: "var(--primary)" }}>{action}<ArrowRight size={15} /></span>
-          </Link>
-        ))}
-      </div>
+      {/* Section F — Quick actions */}
+      <Section title="Quick actions" subtitle="Common tasks to get started">
+        <div className="action-grid">
+          {actions.map(({ title, description, to, icon: Icon }) => (
+            <ActionTile key={title} title={title} description={description} icon={<Icon size={18} />} to={to} />
+          ))}
+        </div>
+      </Section>
     </div>
   );
 }

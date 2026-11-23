@@ -2,21 +2,26 @@
 //
 // Modules mount through nested routes (<Outlet/>) and the sidebar is
 // NavLink-based, so every screen is deep-linkable and survives a refresh.
-// The nav is a flat list of modules: an owner should never have to
-// remember which group a screen lives under.
+// Navigation is grouped around the hotel manager's workflow:
+//   OVERVIEW        — Dashboard
+//   GUEST COMMUNICATION — Inbox, Guest requests, Channels, AI Concierge
+//   HOTEL OPERATIONS  — Reservations, Rooms & Accommodation
+//   ADMINISTRATION    — Settings
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   BedDouble,
   Check,
-  ClipboardList,
   Copy,
   LayoutDashboard,
   Menu,
   Settings,
   MessagesSquare,
   X,
-  DoorOpen
+  DoorOpen,
+  Globe,
+  ShieldAlert,
+  Ticket,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Tippy from "@tippyjs/react";
@@ -27,6 +32,10 @@ import { Modal, useToast } from "./components/ui";
 import { useWorkspace } from "./workspace/workspaceContext";
 import { useHotelProfile } from "./lib/hotelProfile";
 import innpilotMark from "./assets/brand/innpilot-mark.png";
+import { onSnapshot, query, Timestamp } from "firebase/firestore";
+import { COLLECTIONS } from "./lib/collections";
+import { hotelCollection } from "./lib/hotelScope";
+import { useNewGuestRequestCount } from "./lib/guestRequests";
 
 interface NavItem {
   icon: ReactNode;
@@ -35,25 +44,29 @@ interface NavItem {
   end?: boolean;
 }
 
-/** The modules, in the order an owner works through their day. */
+/** Navigation flat list — Dashboard, Inbox, Guest requests, Reservations, Channels, Rooms, Settings. */
 const NAV: NavItem[] = [
-  { icon: <LayoutDashboard size={19} />, label: "Dashboard", to: "/dashboard", end: true },
-  { icon: <MessagesSquare size={19} />, label: "Inbox", to: "/dashboard/inbox" },
-  { icon: <ClipboardList size={19} />, label: "Requests", to: "/dashboard/requests" },
-  { icon: <BedDouble size={19} />, label: "Rooms", to: "/dashboard/accommodation" },
-  { icon: <Settings size={19} />, label: "Settings", to: "/dashboard/settings" },
+  { icon: <LayoutDashboard size={18} />, label: "Dashboard", to: "/dashboard", end: true },
+  { icon: <MessagesSquare size={18} />, label: "Inbox", to: "/dashboard/inbox" },
+  { icon: <Ticket size={18} />, label: "Guest requests", to: "/dashboard/requests" },
+  { icon: <ShieldAlert size={18} />, label: "Reservations", to: "/dashboard/reservations" },
+  { icon: <Globe size={18} />, label: "Channels", to: "/dashboard/channels" },
+  { icon: <BedDouble size={18} />, label: "Rooms", to: "/dashboard/rooms" },
+  { icon: <Settings size={18} />, label: "Settings", to: "/dashboard/settings" },
 ];
 
 /**
  * Header copy per route. Sub-routes fall back to their parent module by
- * longest-prefix match, so /dashboard/bar/products still reads "Bar".
+ * longest-prefix match.
  */
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard": { title: "Dashboard", subtitle: "Manage room inventory, guest inquiries and reservations" },
-  "/dashboard/inbox": { title: "Inbox", subtitle: "Guest conversations from every channel" },
+  "/dashboard": { title: "Dashboard", subtitle: "Booking conversion and inquiry performance at a glance" },
+  "/dashboard/inbox": { title: "Inbox", subtitle: "Live guest conversations from your AI Concierge" },
+  "/dashboard/channels": { title: "Channels & Integrations", subtitle: "Web concierge and link; other channels coming soon" },
+  "/dashboard/reservations": { title: "Reservations", subtitle: "Manage the booking lifecycle from inquiry to check-out" },
+  "/dashboard/rooms": { title: "Rooms & Accommodation", subtitle: "Configure room categories, units and availability" },
   "/dashboard/requests": { title: "Guest requests", subtitle: "Issues and requests guests raised through the concierge" },
-  "/dashboard/accommodation": { title: "Rooms", subtitle: "Room inventory, reservations and occupancy" },
-  "/dashboard/settings": { title: "Settings", subtitle: "Hotel profile and activity" },
+  "/dashboard/settings": { title: "Settings", subtitle: "Hotel profile, team and activity" },
 };
 
 function metaFor(pathname: string) {
@@ -70,6 +83,8 @@ function SidebarContent({
   onNavigate,
   onToggleCollapse,
   onLeave,
+  newBookingsCount,
+  newRequestsCount,
 }: {
   collapsed: boolean;
   hotelName: string;
@@ -77,6 +92,8 @@ function SidebarContent({
   onNavigate?: () => void;
   onToggleCollapse?: () => void;
   onLeave: () => void;
+  newBookingsCount: number;
+  newRequestsCount: number;
 }) {
   return (
     <>
@@ -127,45 +144,65 @@ function SidebarContent({
       )}
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV.map((item) => (
-          <Tippy
-            key={item.to}
-            content={item.label}
-            placement="right"
-            disabled={!collapsed}
-          >
-            <NavLink
-              to={item.to}
-              end={item.end}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                `relative flex items-center w-full px-3 py-2.5 rounded-lg transition-all text-[14.5px] ${
-                  collapsed ? "justify-center" : "gap-3"
-                } ${
-                  isActive
-                    ? "bg-[var(--rail-active)] text-white font-semibold"
-                    : "hover:bg-white/5 hover:text-white"
-                }`
-              }
-              style={({ isActive }) => (isActive ? undefined : { color: "var(--rail-text)" })}
+        {NAV.map((item) => {
+          const badgeCount =
+            item.to === "/dashboard/reservations"
+              ? newBookingsCount
+              : item.to === "/dashboard/requests"
+                ? newRequestsCount
+                : 0;
+          return (
+            <Tippy
+              key={item.to}
+              content={item.label}
+              placement="right"
+              disabled={!collapsed}
             >
-              {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <span
-                      className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full"
-                      style={{ background: "var(--brand-cyan)" }}
-                    />
-                  )}
-                  <span style={isActive ? { color: "var(--brand-cyan)" } : undefined}>
-                    {item.icon}
-                  </span>
-                  {!collapsed && <span>{item.label}</span>}
-                </>
-              )}
-            </NavLink>
-          </Tippy>
-        ))}
+              <NavLink
+                to={item.to}
+                end={item.end}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  `relative flex items-center w-full px-3 py-2.5 rounded-lg transition-all text-[14.5px] ${
+                    collapsed ? "justify-center" : "gap-3"
+                  } ${
+                    isActive
+                      ? "bg-[var(--rail-active)] text-white font-semibold"
+                      : "hover:bg-white/5 hover:text-white"
+                  }`
+                }
+                style={({ isActive }) => (isActive ? undefined : { color: "var(--rail-text)" })}
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span
+                        className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full"
+                        style={{ background: "var(--brand-cyan)" }}
+                      />
+                    )}
+                    <span style={isActive ? { color: "var(--brand-cyan)" } : undefined}>
+                      {item.icon}
+                    </span>
+                    {!collapsed && (
+                      <>
+                        {item.label}
+                        {badgeCount > 0 && (
+                          <span
+                            className="ml-1 inline-flex items-center justify-center min-w-5 h-5 rounded-full text-[10px] font-bold"
+                            style={{ background: "var(--brand-cyan)", color: "#fff" }}
+                          >
+                            {badgeCount}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            </Tippy>
+          );
+        })}
       </nav>
 
       {/* The active workspace. No accounts exist, so this is the hotel, not a person. */}
@@ -299,6 +336,38 @@ export default function AppShell() {
   const { profile } = useHotelProfile(hotelId);
   const mainRef = useRef<HTMLElement>(null);
 
+  // Bookings made in the last 24 hours — badge on the Reservations nav item.
+  const [newBookingsCount, setNewBookingsCount] = useState(0);
+  // Requests not yet acknowledged — badge on the Guest requests nav item.
+  const newRequestsCount = useNewGuestRequestCount(hotelId);
+
+  useEffect(() => {
+    if (!hotelId) {
+      setNewBookingsCount(0);
+      return;
+    }
+    const dayAgo = Date.now() - 24 * 60 * 60_000;
+    const recent = (value: unknown) => {
+      if (!value) return false;
+      const date = value instanceof Timestamp
+        ? value.toDate()
+        : new Date(value as string | number | Date);
+      return !Number.isNaN(date.getTime()) && date.getTime() >= dayAgo;
+    };
+    const unsub = onSnapshot(
+      query(hotelCollection(hotelId, COLLECTIONS.BOOKINGS)),
+      (snap) => {
+        let count = 0;
+        snap.docs.forEach((d) => {
+          const data = d.data() as Record<string, unknown>;
+          if (recent(data.createdAt)) count++;
+        });
+        setNewBookingsCount(count);
+      },
+    );
+    return () => unsub();
+  }, [hotelId]);
+
   // A route change should start the new page at the top, not wherever the
   // previous one was scrolled to.
   useEffect(() => {
@@ -332,6 +401,8 @@ export default function AppShell() {
           hotelLocation={profile.location}
           onToggleCollapse={() => setCollapsed((c) => !c)}
           onLeave={() => setLeaving(true)}
+          newBookingsCount={newBookingsCount}
+          newRequestsCount={newRequestsCount}
         />
       </motion.aside>
 
@@ -371,6 +442,8 @@ export default function AppShell() {
                   setMobileOpen(false);
                   setLeaving(true);
                 }}
+                newBookingsCount={newBookingsCount}
+                newRequestsCount={newRequestsCount}
               />
             </motion.aside>
           </>

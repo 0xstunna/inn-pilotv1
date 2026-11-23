@@ -9,12 +9,9 @@ import {
   selectedHotelLabel,
   channelCounts,
   leadCounts,
-  CHANNELS,
   filterConversations,
   isConversationId,
-  MOCK_CHANNELS,
   relativeTime,
-  sampleThreads,
   snippet,
   sortConversations,
   toConversation,
@@ -41,7 +38,6 @@ function conversation(overrides: Partial<Conversation> = {}): Conversation {
     followUpSentAt: null,
     followUpSnoozedUntil: null,
     messageCount: 1,
-    mock: false,
     createdAt: null,
     updatedAt: null,
     ...overrides,
@@ -62,7 +58,6 @@ describe("toConversation", () => {
         lastGuestAt: stamp,
         followUpSentAt: stamp,
         messageCount: 4,
-        mock: true,
         updatedAt: stamp,
       })
     ).toMatchObject({
@@ -77,7 +72,6 @@ describe("toConversation", () => {
       followUpSentAt: at("2031-01-01T10:00:00Z"),
       followUpSnoozedUntil: null,
       messageCount: 4,
-      mock: true,
     });
   });
 
@@ -93,7 +87,6 @@ describe("toConversation", () => {
       followUpSentAt: null,
       followUpSnoozedUntil: null,
       messageCount: 0,
-      mock: false,
     });
   });
 
@@ -178,41 +171,12 @@ describe("the inbox list", () => {
   });
 });
 
-describe("ids and samples", () => {
+describe("ids", () => {
   it("accepts only 20-character auto-ids as conversation ids", () => {
     expect(isConversationId("AbCdEfGhIj0123456789")).toBe(true);
     for (const bad of ["short", "../hotels/abc/conversations", "AbCdEfGhIj012345678!", 42, null]) {
       expect(isConversationId(bad)).toBe(false);
     }
-  });
-
-  it("offers one sample thread per MOCKED channel, and none for web", () => {
-    const threads = sampleThreads("Lakeside Inn");
-    expect(threads.map((t) => t.conversation.channel).sort()).toEqual([...MOCK_CHANNELS].sort());
-    expect(threads.every((t) => CHANNELS.includes(t.conversation.channel) && t.messages.length > 0)).toBe(true);
-    // Oldest first, so the last message is the latest.
-    for (const t of threads) {
-      const ages = t.messages.map((m) => m.minutesAgo);
-      expect([...ages].sort((a, b) => b - a)).toEqual(ages);
-    }
-    // Samples never quote a price, so they can't contradict the hotel's live rates.
-    expect(JSON.stringify(threads)).not.toMatch(/UGX|KES|USD|\d{2,3},\d{3}/);
-  });
-
-  it("shows the three states a follow-up list sorts out (D21)", () => {
-    const last = (channel: string) => {
-      const thread = sampleThreads("Lakeside Inn").find((t) => t.conversation.channel === channel)!;
-      return thread.messages[thread.messages.length - 1];
-    };
-    // Just written: nobody is late yet.
-    expect(last("whatsapp")).toMatchObject({ role: "guest" });
-    expect(last("whatsapp").minutesAgo).toBeLessThan(60);
-    // Answered, then silence: an interested guest who went quiet.
-    expect(last("instagram")).toMatchObject({ role: "staff" });
-    expect(last("instagram").minutesAgo).toBeGreaterThan(24 * 60);
-    // Asked hours ago and still waiting on the hotel.
-    expect(last("email")).toMatchObject({ role: "guest" });
-    expect(last("email").minutesAgo).toBeGreaterThan(60);
   });
 });
 

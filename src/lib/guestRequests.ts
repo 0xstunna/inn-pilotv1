@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { getDoc, limit, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
+import { getDoc, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { logAction } from "./audit";
 import { COLLECTIONS } from "./collections";
 import { hotelCollection, hotelDoc } from "./hotelScope";
@@ -109,6 +109,32 @@ export function useGuestRequests(hotelId: string | null): {
   }, [hotelId]);
 
   return { requests, loading, error };
+}
+
+/** Live count of unacknowledged requests, for the sidebar badge. */
+export function useNewGuestRequestCount(hotelId: string | null): number {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!hotelId) {
+      setCount(0);
+      return;
+    }
+    const unsub = onSnapshot(
+      query(
+        hotelCollection(hotelId, COLLECTIONS.GUEST_REQUESTS),
+        where("status", "==", "new"),
+      ),
+      (snap) => setCount(snap.size),
+      (err) => {
+        console.error("Failed to count new guest requests:", err);
+        setCount(0);
+      },
+    );
+    return () => unsub();
+  }, [hotelId]);
+
+  return count;
 }
 
 /** Which statuses staff may move this request to right now. */

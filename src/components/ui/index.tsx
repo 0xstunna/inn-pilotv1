@@ -5,7 +5,7 @@
  * states and loading behaviour are identical across Dashboard, Bar,
  * Parking and the rest without a single page re-inventing them.
  */
-import type { ReactNode } from "react";
+import { createElement, isValidElement, type ElementType, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { money, percent } from "../../lib/format";
@@ -16,6 +16,26 @@ export { Modal, ConfirmDialog } from "./Modal";
 // every module imports its UI from one path.
 // eslint-disable-next-line react-refresh/only-export-components
 export { ToastProvider, useToast } from "./Toast";
+
+export {
+  KPICard,
+  StatusChip,
+  StepStepper,
+  Funnel,
+  ActionTile,
+  PremiumTable,
+  Section,
+  FormSection,
+  LoaderOverlay,
+  type KPICardProps,
+  type StatusChipProps,
+  type StepStepperProps,
+  type FunnelProps,
+  type ActionTileProps,
+  type PremiumTableProps,
+  type SectionProps,
+  type FormSectionProps,
+} from "./premium";
 
 // ---------- Page scaffolding ----------
 
@@ -167,20 +187,22 @@ export function StatGrid({ children, columns = 4 }: { children: ReactNode; colum
 
 // ---------- Empty & loading ----------
 
+/** Accepts either a ready-made icon element or a Lucide component. */
 export function EmptyState({
   icon,
   title,
   description,
   action,
 }: {
-  icon: ReactNode;
+  icon: ReactNode | ElementType;
   title: string;
   description: string;
   action?: ReactNode;
 }) {
+  const iconNode = isValidElement(icon) ? icon : createElement(icon as ElementType, { size: 28 });
   return (
     <div className="empty-state">
-      <div className="empty-icon">{icon}</div>
+      <div className="empty-icon">{iconNode}</div>
       <p className="empty-title">{title}</p>
       <p className="empty-desc">{description}</p>
       {action && <div className="mt-3">{action}</div>}

@@ -13,8 +13,8 @@
  */
 import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../../firebase";
-import { COLLECTIONS, ROOM_TYPES, type RoomStatus, type RoomType } from "./collections";
-import { hotelCollection, HOTELS_COLLECTION } from "./hotelScope";
+import { ROOM_TYPES, type RoomStatus, type RoomType } from "./collections";
+import { HOTELS_COLLECTION } from "./hotelScope";
 import { CURRENCIES } from "./hotelProfile";
 import { DEFAULT_CURRENCY } from "./format";
 import { makePublicHotelId, PUBLIC_HOTELS_COLLECTION } from "./publicHotel";
@@ -27,7 +27,6 @@ export interface WorkspaceSetupInput {
   currency: string;
   phone: string;
   email: string;
-  roomCount: number;
 }
 
 export const EMPTY_SETUP: WorkspaceSetupInput = {
@@ -36,12 +35,10 @@ export const EMPTY_SETUP: WorkspaceSetupInput = {
   currency: DEFAULT_CURRENCY,
   phone: "",
   email: "",
-  roomCount: 20,
 };
 
 /** Firestore caps a batch at 500 writes; this keeps well clear of it. */
-export const MIN_ROOMS = 1;
-export const MAX_ROOMS = 200;
+export const MAX_SETUP_WRITES = 500;
 
 export type SetupErrors = Partial<Record<keyof WorkspaceSetupInput, string>>;
 
@@ -58,7 +55,7 @@ export function validateHotelStep(input: WorkspaceSetupInput): SetupErrors {
   return errors;
 }
 
-/** Step 2 — how to reach it, and how big it is. Contact details are optional. */
+/** Step 2 — how to reach it. Contact details are optional. */
 export function validateBusinessStep(input: WorkspaceSetupInput): SetupErrors {
   const errors: SetupErrors = {};
   if (input.phone.trim() && !PHONE_PATTERN.test(input.phone.trim())) {
@@ -66,9 +63,6 @@ export function validateBusinessStep(input: WorkspaceSetupInput): SetupErrors {
   }
   if (input.email.trim() && !EMAIL_PATTERN.test(input.email.trim())) {
     errors.email = "Enter a valid email address.";
-  }
-  if (!Number.isInteger(input.roomCount) || input.roomCount < MIN_ROOMS || input.roomCount > MAX_ROOMS) {
-    errors.roomCount = `Enter between ${MIN_ROOMS} and ${MAX_ROOMS} rooms.`;
   }
   return errors;
 }
@@ -158,7 +152,7 @@ export function summarizeRooms(rooms: PlannedRoom[]): { type: RoomType; count: n
  */
 export async function createWorkspace(
   input: WorkspaceSetupInput
-): Promise<ServiceResult<{ hotelId: string; publicId: string; roomCount: number }>> {
+): Promise<ServiceResult<{ hotelId: string; publicId: string }>> {
   const errors = { ...validateHotelStep(input), ...validateBusinessStep(input) };
   const firstError = Object.values(errors)[0];
   if (firstError) return fail(firstError);
@@ -167,7 +161,6 @@ export async function createWorkspace(
   const hotelId = hotelRef.id;
   const hotelName = input.hotelName.trim();
   const publicId = makePublicHotelId(hotelName);
-  const rooms = planRooms(input.roomCount, input.currency);
 
   const batch = writeBatch(db);
   batch.set(hotelRef, {
@@ -183,15 +176,6 @@ export async function createWorkspace(
   });
   batch.set(doc(db, PUBLIC_HOTELS_COLLECTION, publicId), { hotelId, createdAt: serverTimestamp() });
 
-  const roomsCollection = hotelCollection(hotelId, COLLECTIONS.ROOMS);
-  for (const room of rooms) {
-    batch.set(doc(roomsCollection), {
-      ...room,
-      hotelId,
-      createdAt: serverTimestamp(),
-    });
-  }
-
   try {
     await batch.commit();
   } catch (error) {
@@ -199,6 +183,6 @@ export async function createWorkspace(
     return fail(describeWriteFailure(error, "We couldn't create your workspace. Please try again."));
   }
 
-  logAction(hotelId, "Workspace created", "settings", hotelId, `${hotelName} · ${rooms.length} rooms`);
-  return ok({ hotelId, publicId, roomCount: rooms.length });
+  logAction(hotelId, "Workspace created", "settings", hotelId, hotelName);
+  return ok({ hotelId, publicId });
 }

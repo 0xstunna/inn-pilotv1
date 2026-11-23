@@ -124,6 +124,8 @@ export interface GuestTurn {
   };
   /** The source channel of this turn (defaults to "web" in the mirror). */
   channel?: "web" | "whatsapp";
+  /** The scoped hotel had availability or a quote this turn. */
+  quoted?: boolean;
 }
 
 /**
@@ -211,6 +213,7 @@ export async function recordGuestTurn(thread: GuestThread, turn: GuestTurn): Pro
       backfill: mirror.exists ? undefined : (history ?? undefined),
       selection: selected ? "this" : "none",
       selectedHotelName: selected?.profile.name ?? "",
+      quoted: turn.quoted,
       bookedElsewhere: Boolean(written.reservation && written.reservation.hotelId !== scope.hotelId),
       guest,
       ...(booking

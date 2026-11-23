@@ -130,7 +130,6 @@ describe("recording web conversations", () => {
       handledBy: "ai",
       bookingStatus: "none",
       messageCount: 2,
-      mock: false,
       lead: { score: "cold", reasons: ["General questions only so far"] },
       hotelId: HOTEL_A,
       lastMessage: { role: "ai", text: "Hello! What dates are you thinking of?" },
@@ -182,38 +181,30 @@ describe("recording web conversations", () => {
     expect((await threadsOf(HOTEL_A).doc(id).get()).data()).toMatchObject({ bookingStatus: "booked", guestName: "Amina Okello" });
   });
 
-  it("a turn the AI couldn't answer still reaches the inbox, with the guest's message", async () => {
+  it("a provider failure returns a safe error without creating an inbox thread", async () => {
     gemini.responses = ["fail"];
     const res = await chat({ publicHotelId: PUBLIC_A, message: "Hello?" });
 
     expect(res.statusCode).toBe(503);
-    const id = String(res.body.conversationId);
-    expect(id).toMatch(/^[A-Za-z0-9]{20}$/);
-    expect((await threadsOf(HOTEL_A).doc(id).get()).data()).toMatchObject({
-      messageCount: 1,
-      lastMessage: { role: "guest", text: "Hello?" },
-    });
+    expect(res.body).toMatchObject({ code: "not_configured" });
+    expect(res.body.conversationId).toBeUndefined();
+    expect((await threadsOf(HOTEL_A).get()).size).toBe(0);
   });
 
-  it("retrying a message whose turn failed doesn't record it twice", async () => {
-    gemini.responses = ["fail", "fail", answer("Yes, we do.")];
+  it("a failed turn leaves no thread, so the retry opens a fresh conversation", async () => {
+    gemini.responses = ["fail", answer("Yes, we do.")];
     const first = await chat({ publicHotelId: PUBLIC_A, message: "Do you have parking?", turnId: "abc123" });
-    const id = String(first.body.conversationId);
-    // The retry fails too, then succeeds: same message, same turn id.
-    await chat({ publicHotelId: PUBLIC_A, message: "Do you have parking?", conversationId: id, turnId: "abc123" });
-    const last = await chat({ publicHotelId: PUBLIC_A, message: "Do you have parking?", conversationId: id, turnId: "abc123" });
+    expect(first.statusCode).toBe(503);
+    expect(first.body.conversationId).toBeUndefined();
 
-    expect(last.statusCode).toBe(200);
+    const retry = await chat({ publicHotelId: PUBLIC_A, message: "Do you have parking?", turnId: "abc123" });
+    expect(retry.statusCode).toBe(200);
+    const id = String(retry.body.conversationId);
     expect((await messagesOf(HOTEL_A, id)).map((m) => [m.role, m.text])).toEqual([
       ["guest", "Do you have parking?"],
       ["ai", "Yes, we do."],
     ]);
     expect((await threadsOf(HOTEL_A).doc(id).get()).data()).toMatchObject({ messageCount: 2, pendingTurnId: "" });
-
-    // A new message with a new id is recorded as usual.
-    gemini.responses = [answer("Anything else?")];
-    await chat({ publicHotelId: PUBLIC_A, message: "Great", conversationId: id, turnId: "def456" });
-    expect((await threadsOf(HOTEL_A).doc(id).get()).data()).toMatchObject({ messageCount: 4 });
   });
 
   it("a staff reply written while the AI is still answering keeps its place and its count", async () => {
@@ -290,11 +281,14 @@ describe("lead scoring", () => {
     expect(thread.lead.reasons).toEqual(expect.arrayContaining(["Booked a room", "Wants a suite or an upgrade", "Travelling for a special occasion"]));
   });
 
-  it("a turn the AI couldn't answer is still scored from what the guest said", async () => {
+  it("a provider failure stays guest-safe and records no lead", async () => {
     gemini.responses = ["fail"];
     const res = await chat({ publicHotelId: PUBLIC_A, message: "I want to book a room for 6 people next weekend" });
-    const thread = (await threadsOf(HOTEL_A).doc(String(res.body.conversationId)).get()).data()!;
-    expect(thread.lead).toMatchObject({ score: "hot" });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toMatchObject({ code: "not_configured" });
+    expect(res.body.conversationId).toBeUndefined();
+    expect((await threadsOf(HOTEL_A).get()).size).toBe(0);
   });
 });
 
@@ -323,14 +317,18 @@ describe("follow-ups (D21)", () => {
     expect(millis((await threadsOf(HOTEL_A).doc(id).get()).data()!.lastGuestAt)).toBeGreaterThan(before);
   });
 
-  it("a retried message doesn't move it: the guest has been waiting since they first wrote", async () => {
+  it("a failed turn leaves no wait to preserve; a successful retry starts one", async () => {
     gemini.responses = ["fail", answer("Yes, we do.")];
     const first = await chat({ publicHotelId: PUBLIC_A, message: "Do you have parking?", turnId: "abc123" });
-    const id = String(first.body.conversationId);
-    const waitingSince = millis((await threadsOf(HOTEL_A).doc(id).get()).data()!.lastGuestAt);
+    expect(first.statusCode).toBe(503);
+    expect(first.body.conversationId).toBeUndefined();
 
-    await chat({ publicHotelId: PUBLIC_A, message: "Do you have parking?", conversationId: id, turnId: "abc123" });
-    expect(millis((await threadsOf(HOTEL_A).doc(id).get()).data()!.lastGuestAt)).toBe(waitingSince);
+    const retry = await chat({ publicHotelId: PUBLIC_A, message: "Do you have parking?", turnId: "abc123" });
+    expect(retry.statusCode).toBe(200);
+    const id = String(retry.body.conversationId);
+    const thread = (await threadsOf(HOTEL_A).doc(id).get()).data()!;
+    const [guestMessage] = await messagesOf(HOTEL_A, id);
+    expect(millis(thread.lastGuestAt)).toBe(millis(guestMessage.at));
   });
 });
 
@@ -368,7 +366,7 @@ describe("conversation isolation", () => {
     expect((await threadsOf(HOTEL_A).doc(idB).get()).exists).toBe(false);
   });
 
-  it("a mocked-channel thread can't be continued from the web concierge", async () => {
+  it("a non-web thread can't be continued from the web concierge", async () => {
     await threadsOf(HOTEL_A).doc("WhatsAppThread000001").set({ channel: "whatsapp", handledBy: "ai", messageCount: 3, hotelId: HOTEL_A });
     gemini.responses = [answer("Hello!")];
     const res = await chat({ publicHotelId: PUBLIC_A, message: "Hi", conversationId: "WhatsAppThread000001" });

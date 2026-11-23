@@ -8,10 +8,9 @@
  *   hotels/{hotelId}/conversations/{conversationId}/messages/{messageId}
  *     role, text, at   (append-only)
  *
- * Web conversations are written by the concierge gateway on the server as
- * real guests chat. WhatsApp, Instagram and Email are MOCKED for the
- * challenge: sample threads a hotel can add from the inbox, flagged
- * `mock: true`, with no real integration behind them.
+ * Web is the only live channel: the concierge gateway writes these threads
+ * as real guests chat. Other channels are coming soon and are not seeded as
+ * sample data.
  *
  * Pure — no Firestore import — so the app, the server and the tests share
  * one definition. Keep the enums in sync with firestore.rules.
@@ -21,9 +20,6 @@ import { toLeadSignals, type LeadSignals } from "./leadScoring.js";
 
 export const CHANNELS = ["web", "whatsapp", "instagram", "email"] as const;
 export type Channel = (typeof CHANNELS)[number];
-
-/** Channels with no real integration in this build. */
-export const MOCK_CHANNELS: readonly Channel[] = ["whatsapp", "instagram", "email"];
 
 export const HANDLERS = ["ai", "human"] as const;
 /** Who answers the guest: the AI concierge, or a member of staff who took over. */
@@ -150,7 +146,6 @@ export interface Conversation {
   /** "Not now": this conversation stays off the follow-up list until then. */
   followUpSnoozedUntil: Date | null;
   messageCount: number;
-  mock: boolean;
   /** The guest's inquiry details, gathered across the conversation. */
   inquiry: ConversationInquiry;
   /** Which stage of the lead pipeline this conversation is at. */
@@ -251,7 +246,6 @@ export function toConversation(id: string, data: Record<string, unknown>): Conve
     followUpSentAt: toDate(data.followUpSentAt),
     followUpSnoozedUntil: toDate(data.followUpSnoozedUntil),
     messageCount: typeof data.messageCount === "number" ? data.messageCount : 0,
-    mock: data.mock === true,
     inquiry: toInquiry(data.inquiry),
     pipelineStage: oneOf(PIPELINE_STAGES, data.pipelineStage, "new"),
     nextAction: toNextAction(data.nextAction),
@@ -545,82 +539,4 @@ export function relativeTime(date: Date | null, now: Date = new Date()): string 
   if (minutes < 24 * 60) return `${Math.floor(minutes / 60)}h`;
   if (minutes < 7 * 24 * 60) return date.toLocaleDateString("en-GB", { weekday: "short" });
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-/* ------------------------------------------------------------------ */
-/* Mocked channels                                                      */
-/* ------------------------------------------------------------------ */
-
-export interface SampleThread {
-  conversation: {
-    channel: Channel;
-    guestName: string;
-    guestContact: string;
-    handledBy: Handler;
-    bookingStatus: ConversationBookingState;
-    reservationId: string;
-  };
-  /** Minutes before now each message was sent, oldest first. */
-  messages: { role: MessageRole; text: string; minutesAgo: number }[];
-}
-
-/**
- * Sample threads for the MOCKED channels, in the shape real ones would
- * take. They describe questions and answers only in general terms — no
- * rates or availability — so they can't contradict a hotel's live data.
- *
- * Their ages are part of the sample: one guest has just written, one has
- * been waiting hours for an answer, and one interested guest went quiet
- * after the hotel replied — the three states the follow-up list sorts out.
- */
-export function sampleThreads(hotelName: string): SampleThread[] {
-  const name = hotelName.trim() || "the hotel";
-  return [
-    {
-      conversation: {
-        channel: "whatsapp",
-        guestName: "Grace Namusoke",
-        guestContact: "+256 772 555 010",
-        handledBy: "ai",
-        bookingStatus: "quoted",
-        reservationId: "",
-      },
-      messages: [
-        { role: "guest", text: `Hello! Do you have a double room at ${name} for next Friday and Saturday?`, minutesAgo: 42 },
-        { role: "ai", text: "Hi Grace! Yes, we have Double rooms free for those two nights. Would you like me to reserve one for you?", minutesAgo: 41 },
-        { role: "guest", text: "Maybe. Is breakfast included? I'll confirm with my husband tonight.", minutesAgo: 25 },
-      ],
-    },
-    {
-      conversation: {
-        channel: "instagram",
-        guestName: "@safari.sam",
-        guestContact: "@safari.sam",
-        handledBy: "human",
-        bookingStatus: "none",
-        reservationId: "",
-      },
-      messages: [
-        { role: "guest", text: "We're planning a team retreat for 12 people in December. Can you do a group rate?", minutesAgo: 60 * 32 },
-        { role: "ai", text: "That sounds great! Group rates are arranged by our team, so I've passed your request on. Someone will reply here shortly.", minutesAgo: 60 * 32 - 1 },
-        // Answered, then silence: the interested guest a hotel normally loses (D21).
-        { role: "staff", text: "Hi Sam, this is Ruth from reservations. Happy to help. Which dates are you looking at?", minutesAgo: 60 * 30 },
-      ],
-    },
-    {
-      conversation: {
-        channel: "email",
-        guestName: "Daniel Otieno",
-        guestContact: "daniel.otieno@example.com",
-        handledBy: "ai",
-        bookingStatus: "booked",
-        reservationId: "RSV-SAMPLE-EMAIL1",
-      },
-      messages: [
-        { role: "guest", text: "Please book a suite for my anniversary, arriving on the 20th for three nights.", minutesAgo: 60 * 26 },
-        { role: "ai", text: "Congratulations! Your suite is booked. Your reservation reference is RSV-SAMPLE-EMAIL1.", minutesAgo: 60 * 26 - 2 },
-        { role: "guest", text: "Thank you! Could you arrange flowers in the room?", minutesAgo: 60 * 5 },
-      ],
-    },
-  ];
 }

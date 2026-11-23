@@ -212,6 +212,7 @@ export interface GuestRequestAck {
 /** A reservation create_reservation confirmed this turn. */
 export interface ConciergeBooking {
   reservationId: string;
+  conversationId: string;
   hotel: string;
   hotelName: string;
   city: string;

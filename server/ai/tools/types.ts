@@ -16,6 +16,8 @@ export interface ToolContext {
   guestMessage: string;
   pendingBooking: PendingBooking | null;
   now: Date;
+  /** The guest thread this turn belongs to, so bookings can be linked back to it. */
+  conversationId: string;
 }
 
 /**

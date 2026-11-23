@@ -23,6 +23,10 @@ const ConciergePage = lazy(() => import("./pages/concierge/ConciergePage"));
 const AppShell = lazy(() => import("./dashboard"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Inbox = lazy(() => import("./pages/inbox/Inbox"));
+const Channels = lazy(() => import("./pages/Channels"));
+
+const Reservations = lazy(() => import("./pages/Reservations"));
+const Rooms = lazy(() => import("./pages/Rooms"));
 const RequestQueue = lazy(() => import("./pages/requests/RequestQueue"));
 const RequestDetail = lazy(() => import("./pages/requests/RequestDetail"));
 const Accommodation = lazy(() => import("./Accommodation"));
@@ -91,6 +95,10 @@ function App() {
             >
               <Route index element={<Dashboard />} />
               <Route path="inbox" element={<Inbox />} />
+              <Route path="channels" element={<Channels />} />
+              
+              <Route path="reservations" element={<Reservations />} />
+              <Route path="rooms" element={<Rooms />} />
               <Route path="requests" element={<RequestQueue />} />
               <Route path="requests/:requestId" element={<RequestDetail />} />
               <Route path="accommodation" element={<Accommodation />} />

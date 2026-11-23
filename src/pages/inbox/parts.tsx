@@ -3,11 +3,10 @@
  * conversation row, and a message bubble.
  */
 import type { ReactNode } from "react";
-import { BellRing, Bot, Building2, CalendarDays, Globe, Headset, Instagram, Mail, MessageCircle, User2 } from "lucide-react";
+import { BellRing, Bot, Building2, CalendarDays, Globe, Headset, User2 } from "lucide-react";
 
 import {
   BOOKING_STATE_LABEL,
-  CHANNEL_LABEL,
   conversationStatus,
   selectedHotelLabel,
   STATUS_LABEL,
@@ -17,7 +16,6 @@ import {
   NEXT_ACTION_TONE,
   relativeTime,
   snippet,
-  type Channel,
   type Conversation,
   type ConversationBookingState,
   type ConversationMessage,
@@ -30,37 +28,12 @@ import { FOLLOW_UP_KIND_LABEL, waitedLabel, type FollowUp } from "../../lib/foll
 import { LEAD_EMOJI, LEAD_MEANING } from "../../lib/leadScoring";
 import { dateTime } from "../../lib/format";
 
-const CHANNEL_STYLE: Record<Channel, { icon: ReactNode; color: string; soft: string }> = {
-  web: { icon: <Globe size={12} />, color: "var(--primary-active)", soft: "var(--primary-soft)" },
-  whatsapp: { icon: <MessageCircle size={12} />, color: "#15803d", soft: "#ecfdf3" },
-  instagram: { icon: <Instagram size={12} />, color: "#be185d", soft: "#fdf2f8" },
-  email: { icon: <Mail size={12} />, color: "var(--info-text)", soft: "var(--info-soft)" },
+/** Web is the only live channel; every row gets the same small source marker. */
+const WEB_MARKER: { icon: ReactNode; color: string; soft: string } = {
+  icon: <Globe size={12} />,
+  color: "var(--primary-active)",
+  soft: "var(--primary-soft)",
 };
-
-export function ChannelBadge({ channel, mock, configured }: { channel: Channel; mock?: boolean; configured?: boolean }) {
-  const style = CHANNEL_STYLE[channel];
-  const isWeb = channel === "web";
-  const title = mock
-    ? `${CHANNEL_LABEL[channel]} (simulated — sample data only)`
-    : isWeb
-      ? "AI Concierge — website chat"
-      : configured
-        ? `${CHANNEL_LABEL[channel]} — connected`
-        : `${CHANNEL_LABEL[channel]} — not configured (add credentials in Settings)`;
-  return (
-    <span
-      className="badge badge-plain"
-      style={{
-        background: mock ? "var(--warning-soft)" : style.soft,
-        color: mock ? "var(--warning-text)" : style.color,
-        borderColor: "transparent",
-      }}
-      title={title}
-    >
-      {style.icon} {CHANNEL_LABEL[channel]}{!isWeb && !mock && configured === false && <span className="text-[10px] ml-1" style={{ opacity: 0.7 }}>(setup required)</span>}
-    </span>
-  );
-}
 
 export function HandlerBadge({ handledBy }: { handledBy: Handler }) {
   return handledBy === "ai" ? (
@@ -220,7 +193,7 @@ export function GuestAvatar({ conversation, size = 40 }: { conversation: Convers
       .slice(0, 2)
       .join("")
       .toUpperCase() || "G";
-  const style = CHANNEL_STYLE[conversation.channel];
+  const style = WEB_MARKER;
   return (
     <span className="relative shrink-0" style={{ width: size, height: size }} aria-hidden>
       <span
@@ -248,7 +221,6 @@ export function ConversationRow({
   onSelect,
   now,
   hotelName,
-  channelConfig,
 }: {
   conversation: Conversation;
   followUp: FollowUp | null;
@@ -256,7 +228,6 @@ export function ConversationRow({
   onSelect: () => void;
   now: Date;
   hotelName: string;
-  channelConfig?: Record<string, boolean>;
 }) {
   const last = conversation.lastMessage;
   return (
@@ -296,7 +267,6 @@ export function ConversationRow({
           </span>
         )}
         <span className="flex flex-wrap gap-1.5 mt-2">
-          <ChannelBadge channel={conversation.channel} mock={conversation.mock} configured={channelConfig?.[conversation.channel]} />
           <HandlerBadge handledBy={conversation.handledBy} />
           <LeadBadge lead={conversation.lead} />
           <StatusBadge conversation={conversation} />

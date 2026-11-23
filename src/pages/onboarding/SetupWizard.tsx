@@ -2,15 +2,16 @@
  * Get Started — the three-step hotel setup wizard.
  *
  *   1. Hotel     — name, city, currency
- *   2. Business  — phone, email, number of rooms
+ *   2. Contact   — phone and email
  *   3. Workspace — review, then create
  *
  * Designed to take well under thirty seconds: two required fields on the
  * first step, sensible defaults for the rest, and Enter advances every
  * step. All validation and the actual write live in src/lib/onboarding.ts;
- * this file only presents them.
+ * this file only presents them. Rooms are created and managed in the
+ * dashboard's Rooms page, not during registration.
  */
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -20,9 +21,7 @@ import {
   Building2,
   Check,
   LayoutDashboard,
-  Minus,
   Phone,
-  Plus,
   Sparkles,
 } from "lucide-react";
 
@@ -30,14 +29,9 @@ import innpilotMark from "../../assets/brand/innpilot-mark.png";
 import innpilotMarkOnLight from "../../assets/brand/innpilot-mark-on-light.png";
 import { FormError, useToast } from "../../components/ui";
 import { CURRENCIES, useHotelProfile } from "../../lib/hotelProfile";
-import { money, plural } from "../../lib/format";
 import {
   EMPTY_SETUP,
-  MAX_ROOMS,
-  MIN_ROOMS,
   createWorkspace,
-  planRooms,
-  summarizeRooms,
   validateBusinessStep,
   validateHotelStep,
   type SetupErrors,
@@ -49,7 +43,7 @@ type Step = 0 | 1 | 2;
 
 const STEPS = [
   { title: "Hotel", description: "Name, city and currency" },
-  { title: "Business", description: "Contact and rooms" },
+  { title: "Contact", description: "Phone and email" },
   { title: "Workspace", description: "Review and create" },
 ] as const;
 
@@ -66,15 +60,6 @@ export default function SetupWizard() {
   const [errors, setErrors] = useState<SetupErrors>({});
   const [creating, setCreating] = useState(false);
   const [submitError, setSubmitError] = useState("");
-
-  /** Only meaningful once step 2 has validated the room count. */
-  const roomSummary = useMemo(
-    () =>
-      validateBusinessStep(form).roomCount
-        ? []
-        : summarizeRooms(planRooms(form.roomCount, form.currency)),
-    [form]
-  );
 
   const update = <K extends keyof WorkspaceSetupInput>(key: K, value: WorkspaceSetupInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -173,9 +158,7 @@ export default function SetupWizard() {
                 >
                   {step === 0 && <HotelStep form={form} errors={errors} update={update} />}
                   {step === 1 && <BusinessStep form={form} errors={errors} update={update} />}
-                  {step === 2 && (
-                    <ReviewStep form={form} rooms={roomSummary} onEdit={(target) => setStep(target)} />
-                  )}
+                  {step === 2 && <ReviewStep form={form} onEdit={(target) => setStep(target)} />}
                 </motion.div>
               </AnimatePresence>
 
@@ -233,7 +216,7 @@ export default function SetupWizard() {
 
 function BrandPanel() {
   const points = [
-    { icon: <BedDouble size={18} />, text: "Rooms and starting rates, built for you" },
+    { icon: <BedDouble size={18} />, text: "Add rooms and rates whenever you're ready" },
     { icon: <LayoutDashboard size={18} />, text: "A live dashboard for revenue and occupancy" },
     { icon: <Sparkles size={18} />, text: "No sign-up, no password, no installation" },
   ];
@@ -262,8 +245,8 @@ function BrandPanel() {
           Your hotel, up and running in under a minute.
         </h1>
         <p className="text-base leading-relaxed mb-8" style={{ color: "var(--rail-text)" }}>
-          Create a workspace and InnPilot sets up your rooms, nightly rates and dashboard, ready
-          for your first booking.
+          Create a workspace and InnPilot sets up your dashboard. Add your rooms and nightly rates
+          next, and you're ready for your first booking.
         </p>
         <ul className="space-y-4">
           {points.map((point) => (
@@ -456,15 +439,12 @@ function HotelStep({ form, errors, update }: StepProps) {
 }
 
 function BusinessStep({ form, errors, update }: StepProps) {
-  const setRooms = (value: number) =>
-    update("roomCount", Math.min(MAX_ROOMS, Math.max(MIN_ROOMS, value)));
-
   return (
     <>
       <StepHeading
         icon={<Phone size={22} />}
-        title="Business details"
-        subtitle="Contact details and a starting inventory. You can register your actual room names and types next."
+        title="Contact details"
+        subtitle="Phone and email are optional. You can add them later in Settings."
       />
       <div className="space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -497,47 +477,6 @@ function BusinessStep({ form, errors, update }: StepProps) {
             />
           </SetupField>
         </div>
-
-        <SetupField
-          id="roomCount"
-          label="Starting room inventory size"
-          error={errors.roomCount}
-          hint="This creates a starter inventory. After setup, open Rooms to review each room name or number, assign its room type and set the correct nightly rate before accepting bookings."
-        >
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="btn btn-secondary h-12 w-12 p-0 justify-center"
-              onClick={() => setRooms((form.roomCount || MIN_ROOMS) - 1)}
-              aria-label="Fewer rooms"
-            >
-              <Minus size={16} />
-            </button>
-            <input
-              id="roomCount"
-              type="number"
-              inputMode="numeric"
-              min={MIN_ROOMS}
-              max={MAX_ROOMS}
-              className="input h-12 w-28 text-center text-lg font-semibold"
-              value={form.roomCount || ""}
-              onChange={(e) =>
-                update("roomCount", e.target.value === "" ? 0 : Math.floor(Number(e.target.value)))
-              }
-              aria-invalid={!!errors.roomCount}
-              aria-describedby={errors.roomCount ? "roomCount-error" : undefined}
-            />
-            <button
-              type="button"
-              className="btn btn-secondary h-12 w-12 p-0 justify-center"
-              onClick={() => setRooms((form.roomCount || 0) + 1)}
-              aria-label="More rooms"
-            >
-              <Plus size={16} />
-            </button>
-            <span className="text-sm muted ml-1">rooms</span>
-          </div>
-        </SetupField>
       </div>
     </>
   );
@@ -545,11 +484,9 @@ function BusinessStep({ form, errors, update }: StepProps) {
 
 function ReviewStep({
   form,
-  rooms,
   onEdit,
 }: {
   form: WorkspaceSetupInput;
-  rooms: ReturnType<typeof summarizeRooms>;
   onEdit: (step: Step) => void;
 }) {
   const editButton = (target: Step, label: string) => (
@@ -606,38 +543,10 @@ function ReviewStep({
         </dl>
       </div>
 
-      <div className="mt-5">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-            {plural(form.roomCount, "starter room")} (review before accepting bookings)
-          </p>
-          {editButton(1, "Edit number of rooms")}
-        </div>
-        <ul className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-          {rooms.map((row, index) => (
-            <li
-              key={row.type}
-              className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
-              style={{
-                borderTop: index === 0 ? "none" : "1px solid var(--border)",
-                background: "var(--surface)",
-              }}
-            >
-              <span className="flex items-center gap-2" style={{ color: "var(--text)" }}>
-                <BedDouble size={15} style={{ color: "var(--text-muted)" }} />
-                {plural(row.count, `${row.type} room`)}
-              </span>
-              <span className="font-medium tabular-nums" style={{ color: "var(--text)" }}>
-                {money(row.price, form.currency)}
-                <span className="muted font-normal"> / night</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs muted mt-2">
-          These are starter entries, not verified hotel inventory or guaranteed prices. Review room identifiers, types and nightly rates in Rooms before publishing your concierge link.
-        </p>
-      </div>
+      <p className="text-xs muted mt-5">
+        Rooms are not created during registration. Add your actual room names, types and nightly
+        rates in the Rooms page before accepting bookings.
+      </p>
     </>
   );
 }
