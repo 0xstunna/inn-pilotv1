@@ -6,7 +6,8 @@
  * shared with the WhatsApp webhook so the AI gateway is not duplicated.
  *
  * This endpoint takes no login, by design: a guest has no account. What
- * protects it is everything else — an in-memory rate limit, a validated and
+ * protects it is everything else — a Firestore-backed rate limit shared across
+ * instances (per hotel and per visitor IP), a validated and
  * length-capped payload, a server-held API key the browser never sees, tools
  * that only reach the conversation's one hotel, and a booking that
  * needs a confirmed summary (DECISIONS D27).
@@ -14,7 +15,7 @@
  * `publicHotelId` scopes the conversation to exactly one hotel. A workspace
  * hotelId is never accepted and never sent back (D2, D14).
  */
-import { enforceRateLimit } from "../../server/ai/rateLimit.js";
+import { enforceSharedRateLimits } from "../../server/ai/sharedRateLimit.js";
 import { processGuestTurn, type ProcessGuestTurnInput } from "../../server/ai/conciergeTurn.js";
 import { isTurnId } from "../../server/conversations.js";
 import {
@@ -189,8 +190,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
   const startedAt = Date.now();
 
   try {
-    enforceRateLimit(`concierge:${clientKey(req)}`, RATE_LIMIT);
-
     const body = await readJsonBody(req);
     if (!body) {
       throw new AiInvalidRequestError(
@@ -205,6 +204,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         "I'm not sure which hotel this chat belongs to. Please reopen it from the hotel's page.",
       );
     }
+
+    // Both counters live in Firestore, so splitting a burst across serverless
+    // instances cannot multiply a caller's allowance. The raw IP is hashed
+    // before anything is stored.
+    const hotelScope =
+      typeof body.publicHotelId === "string" && body.publicHotelId
+        ? body.publicHotelId
+        : "unscoped";
+    await enforceSharedRateLimits([
+      { key: `concierge:hotel:${hotelScope}`, ...RATE_LIMIT },
+      { key: `concierge:ip:${clientKey(req)}`, ...RATE_LIMIT },
+    ]);
 
     const message = requireMessage(body);
     const turnId = isTurnId(body.turnId) ? body.turnId : undefined;
