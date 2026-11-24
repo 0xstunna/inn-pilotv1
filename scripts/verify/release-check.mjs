@@ -99,8 +99,17 @@ const maps = files.filter((f) => f.endsWith(".map"));
 check("no source maps ship (they would republish the source)", maps.length === 0, maps.map(named).join(", "));
 
 const assets = files.filter((f) => /\.(js|css)$/.test(f));
-const unhashed = assets.filter((f) => !/-[A-Za-z0-9_-]{8}\.(js|css)$/.test(f));
-check("every asset is content-hashed, so a deploy can't serve a stale one", unhashed.length === 0, unhashed.map(named).join(", "));
+// widget.js is the public embed entry point: hotel websites paste a stable
+// URL, so it is deliberately the one unhashed script in the build.
+const EMBED_ENTRY = "widget.js";
+const hashed = /-[A-Za-z0-9_-]{8}\.(js|css)$/;
+const unhashed = assets.filter((f) => named(f) !== EMBED_ENTRY && !hashed.test(f));
+check(
+  "every asset is content-hashed, except the stable widget entry",
+  unhashed.length === 0,
+  unhashed.map(named).join(", ")
+);
+check("the embeddable widget keeps a stable unhashed URL", assets.some((f) => named(f) === EMBED_ENTRY));
 
 const html = contents.get(join(DIST, "index.html")) ?? "";
 check(

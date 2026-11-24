@@ -358,6 +358,7 @@ export default function Settings() {
 
           <div className="space-y-5">
           <ConciergeLinkCard hotelId={hotelId} hotelName={profile.name} publicId={profile.publicId} loading={profileLoading} />
+          <InstallWidgetCard publicId={profile.publicId} loading={profileLoading} />
           {!profileLoading && hotelId && (
             <ConciergeListingCard key={`${hotelId}-${profile.publicId}`} hotelId={hotelId} profile={profile} />
           )}
@@ -661,6 +662,70 @@ function ConciergeLinkCard({
           <button type="button" className="btn btn-primary btn-sm" onClick={create} disabled={creating || !hotelId}>
             <Sparkles size={14} /> {creating ? "Creating…" : "Create concierge link"}
           </button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function InstallWidgetCard({ publicId, loading }: { publicId: string; loading: boolean }) {
+  const toast = useToast();
+  const [copied, setCopied] = useState(false);
+  const snippet = publicId
+    ? `<script src="${window.location.origin}/widget.js" data-hotel="${publicId}" async></script>`
+    : "";
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setCopied(true);
+      toast.success("Website snippet copied");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy automatically. Select the snippet and copy it instead.");
+    }
+  };
+
+  return (
+    <Card title="Install on your website">
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        Paste this one line before <code>&lt;/body&gt;</code> on your hotel website, or into your website
+        builder's custom code / footer scripts box. A chat button appears and opens this hotel's concierge.
+      </p>
+      <div className="mt-4">
+        {loading ? (
+          <div className="skeleton" style={{ height: 42 }} />
+        ) : publicId ? (
+          <>
+            <div className="flex items-start gap-2">
+              <code
+                className="flex-1 min-w-0 text-xs rounded-md px-2.5 py-2 select-all"
+                style={{
+                  background: "var(--surface-muted)",
+                  color: "var(--text)",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-all",
+                }}
+              >
+                {snippet}
+              </code>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm shrink-0"
+                onClick={copy}
+                aria-label="Copy website widget snippet"
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                <span className="ml-1.5">{copied ? "Copied" : "Copy"}</span>
+              </button>
+            </div>
+            <p className="text-xs muted mt-2 leading-relaxed">
+              Uses your hotel's public ID above — never your workspace ID. The copyable concierge link stays in
+              Guest AI Concierge for sharing elsewhere.
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-muted">Create your concierge link above first, then copy this snippet.</p>
         )}
       </div>
     </Card>
