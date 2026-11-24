@@ -174,6 +174,10 @@ describe("Messages", () => {
     await assertSucceeds(addDoc(messages(), message()));
   });
 
+  it("staff can add an internal note with its author", async () => {
+    await assertSucceeds(addDoc(messages(), message({ role: "internal_note", text: "Follow up about the quote.", staffName: "Ruth" })));
+  });
+
   it("CANNOT post into a conversation that doesn't exist", async () => {
     await assertFails(addDoc(messages("NoSuchThread00000001"), message()));
   });
@@ -189,6 +193,14 @@ describe("Messages", () => {
 
   it("CANNOT post a message without a timestamp", async () => {
     await assertFails(addDoc(messages(), { role: "staff", text: "Hi", hotelId: HOTEL }));
+  });
+
+  it("CANNOT put an internal-note author on a guest-facing message", async () => {
+    await assertFails(addDoc(messages(), message({ staffName: "Ruth" })));
+  });
+
+  it("CANNOT add an internal note with an over-long author", async () => {
+    await assertFails(addDoc(messages(), message({ role: "internal_note", staffName: "x".repeat(121) })));
   });
 
   it("CANNOT edit a message", async () => {

@@ -322,10 +322,14 @@ service cloud.firestore {
             && tenantFieldOk(hotelId)
             && existsAfter(/databases/$(database)/documents/hotels/$(hotelId)/conversations/$(conversationId))
             && incoming().keys().hasAll(['role', 'text', 'at'])
-            && incoming().role in ['guest', 'ai', 'staff']
+            // Keep in sync with MESSAGE_ROLES in src/lib/conversations.ts.
+            && incoming().role in ['guest', 'ai', 'staff', 'internal_note']
             && incoming().text is string
             && incoming().text.size() > 0
-            && incoming().text.size() <= 4000;
+            && incoming().text.size() <= 4000
+            // Only an internal note carries a staff author; guests never see it.
+            && (!('staffName' in incoming())
+              || (incoming().role == 'internal_note' && optionalText('staffName', 120)));
           allow update, delete: if false;
         }
       }

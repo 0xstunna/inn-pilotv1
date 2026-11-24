@@ -3,7 +3,7 @@
  * conversation row, and a message bubble.
  */
 import type { ReactNode } from "react";
-import { BellRing, Bot, Building2, CalendarDays, Globe, Headset, User2 } from "lucide-react";
+import { BellRing, Bot, Building2, Globe, Headset, Ticket, User2 } from "lucide-react";
 
 import {
   BOOKING_STATE_LABEL,
@@ -103,7 +103,7 @@ export function LeadBadge({ lead }: { lead: LeadAssessment | null }) {
   );
 }
 
-/** Why this guest scored as they did, spelled out at the top of a thread. */
+/** Why this guest scored as they did, spelled out when Details is opened. */
 export function LeadReasons({ lead }: { lead: LeadAssessment | null }) {
   if (!lead) return null;
   return (
@@ -168,7 +168,7 @@ export function AssignedStaffBadge({ conversation }: { conversation: Conversatio
   return (
     <span
       className={`badge badge-plain ${hasAssignment ? "badge-info" : "badge-neutral"}`}
-      title={hasAssignment ? `Assigned to ${conversation.assignedStaffName}` : "Unassigned — click to assign"}
+      title={hasAssignment ? `Assigned to ${conversation.assignedStaffName}` : "Unassigned"}
     >
       {hasAssignment ? (
         <>
@@ -179,6 +179,72 @@ export function AssignedStaffBadge({ conversation }: { conversation: Conversatio
           <User2 size={12} /> Unassigned
         </>
       )}
+    </span>
+  );
+}
+
+/**
+ * The one badge a row needs: why should staff open this now? Everything else
+ * stays in the tooltip, and the full set is in the thread's Details panel.
+ */
+export function ConversationSummaryBadge({
+  conversation,
+  followUp,
+  now,
+}: {
+  conversation: Conversation;
+  followUp: FollowUp | null;
+  now: Date;
+}) {
+  const status = conversationStatus(conversation);
+  const score = conversation.lead?.score;
+  const detail = [
+    score ? `${LEAD_LABEL[score]} lead` : "Not scored yet",
+    conversation.lead?.reasons.join(" · "),
+    PIPELINE_STAGE_LABEL[conversation.pipelineStage],
+    conversation.nextAction ? NEXT_ACTION_LABEL[conversation.nextAction] : "",
+    conversation.assignedStaffName ? `Assigned to ${conversation.assignedStaffName}` : "Unassigned",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  let tone = "badge-neutral";
+  let content: ReactNode;
+
+  if (status === "booked") {
+    tone = "badge-success";
+    content = (
+      <>
+        <Ticket size={12} /> Booked{conversation.reservationId ? ` · ${conversation.reservationId}` : ""}
+      </>
+    );
+  } else if (followUp) {
+    tone = score === "vip" || score === "hot" ? "badge-danger" : "badge-warning";
+    content = (
+      <>
+        {score && <span aria-hidden>{LEAD_EMOJI[score]} </span>}
+        {followUp.kind === "quiet" ? "Quiet" : "Waiting"} {waitedLabel(followUp.hours)}
+      </>
+    );
+  } else if (status === "closed") {
+    content = <>Archived</>;
+  } else if (conversation.handledBy === "human") {
+    tone = "badge-warning";
+    content = (
+      <>
+        <Headset size={12} /> You're handling
+      </>
+    );
+  } else if (conversation.lastMessage?.role === "guest") {
+    tone = "badge-info";
+    content = <>Needs reply · {relativeTime(conversation.lastMessage.at, now)}</>;
+  } else {
+    content = <>Awaiting guest</>;
+  }
+
+  return (
+    <span className={`badge badge-plain ${tone}`} title={detail}>
+      {content}
     </span>
   );
 }
@@ -220,14 +286,14 @@ export function ConversationRow({
   selected,
   onSelect,
   now,
-  hotelName,
+  unread,
 }: {
   conversation: Conversation;
   followUp: FollowUp | null;
   selected: boolean;
   onSelect: () => void;
   now: Date;
-  hotelName: string;
+  unread: boolean;
 }) {
   const last = conversation.lastMessage;
   return (
@@ -245,36 +311,30 @@ export function ConversationRow({
       <GuestAvatar conversation={conversation} />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
-          <span className="font-semibold truncate" style={{ color: "var(--text)" }}>
-            {conversation.guestName}
+          <span className="flex items-center gap-1.5 min-w-0">
+            {unread && (
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ background: "var(--primary)" }}
+                title="New activity since you last opened this"
+              >
+                <span className="sr-only">Unread</span>
+              </span>
+            )}
+            <span className="font-semibold truncate" style={{ color: "var(--text)" }}>
+              {conversation.guestName}
+            </span>
           </span>
           <span className="text-xs muted shrink-0">{relativeTime(last?.at ?? conversation.updatedAt, now)}</span>
         </span>
-        <span className="block text-sm truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>
+        <span
+          className={`block text-sm truncate mt-0.5 ${unread ? "font-medium" : ""}`}
+          style={{ color: "var(--text-secondary)" }}
+        >
           {last ? `${ROLE_PREFIX[last.role]}${snippet(last.text)}` : "No messages yet"}
         </span>
-        {conversation.inquiry.checkIn || conversation.inquiry.guestCount && (
-          <span className="block text-xs mt-0.5 flex items-center gap-1" style={{ color: "var(--text-secondary)" }}>
-            <CalendarDays size={12} />
-            {conversation.inquiry.checkIn && conversation.inquiry.checkOut ? (
-              <>
-                {conversation.inquiry.checkIn} → {conversation.inquiry.checkOut}
-                {conversation.inquiry.guestCount && ` · ${conversation.inquiry.guestCount} guest${conversation.inquiry.guestCount === 1 ? "" : "s"}`}
-              </>
-            ) : conversation.inquiry.guestCount ? (
-              `${conversation.inquiry.guestCount} guest${conversation.inquiry.guestCount === 1 ? "" : "s"}`
-            ) : null}
-          </span>
-        )}
-        <span className="flex flex-wrap gap-1.5 mt-2">
-          <HandlerBadge handledBy={conversation.handledBy} />
-          <LeadBadge lead={conversation.lead} />
-          <StatusBadge conversation={conversation} />
-          <SelectedHotelBadge conversation={conversation} hotelName={hotelName} />
-          <FollowUpBadge followUp={followUp} />
-          <PipelineBadge stage={conversation.pipelineStage} />
-          <NextActionBadge action={conversation.nextAction} />
-          <AssignedStaffBadge conversation={conversation} />
+        <span className="block mt-2">
+          <ConversationSummaryBadge conversation={conversation} followUp={followUp} now={now} />
         </span>
       </span>
     </button>
